@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <Button
+            android:id="@+id/buttonBackDashboard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/back" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/personal_dashboard"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/progressLoadingDashboard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:columnCount="2"
+            android:rowCount="3">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="96dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                android:background="?attr/colorSurfaceContainer"
+                android:gravity="center"
+                android:text="@string/dashboard_total_label"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/textDashboardTotal"
+                android:layout_width="0dp"
+                android:layout_height="96dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                android:background="?attr/colorSurfaceContainer"
+                android:gravity="center"
+                android:textAppearance="?attr/textAppearanceHeadlineLarge" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="72dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                android:gravity="center"
+                android:text="@string/status_todo" />
+
+            <TextView
+                android:id="@+id/textDashboardTodo"
+                android:layout_width="0dp"
+                android:layout_height="72dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                android:gravity="center"
+                android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="72dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                android:gravity="center"
+                android:text="@string/status_in_progress" />
+
+            <TextView
+                android:id="@+id/textDashboardInProgress"
+                android:layout_width="0dp"
+                android:layout_height="72dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                android:gravity="center"
+                android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+        </GridLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/status_completed" />
+
+        <TextView
+            android:id="@+id/textDashboardCompleted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/status_cancelled" />
+
+        <TextView
+            android:id="@+id/textDashboardCancelled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/overdue_tasks"
+            android:textColor="@color/task_overdue"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textDashboardOverdue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+            android:textColor="@color/task_overdue" />
+
+        <TextView
+            android:id="@+id/textDashboardCompletionRate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/progressCompletionRate"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+
+        <Button
+            android:id="@+id/buttonRefreshDashboard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/refresh" />
+    </LinearLayout>
+</ScrollView>

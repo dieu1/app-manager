@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "315356236316",
+    "project_id": "apptaskmanager-9f5e4",
+    "storage_bucket": "apptaskmanager-9f5e4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:315356236316:android:5365559d47abaee5596dd9",
+        "android_client_info": {
+          "package_name": "com.vandieu_manhdung.taskmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQJT2xKEFNYPT6rYDRdEhkRPoPXkWuIlQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

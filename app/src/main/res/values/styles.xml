@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Widget.TaskManager.SurfaceCard" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">20dp</item>
+        <item name="cardElevation">2dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <style name="Widget.TaskManager.HomeCard" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+</resources>

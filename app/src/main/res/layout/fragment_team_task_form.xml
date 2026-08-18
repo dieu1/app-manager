@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.team.task.TeamTaskFormFragment">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/textTeamTaskFormTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/editTeamTaskTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/task_title_hint"
+                android:importantForAutofill="no"
+                android:inputType="textCapSentences"
+                android:maxLength="200" />
+
+            <EditText
+                android:id="@+id/editTeamTaskDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="top"
+                android:hint="@string/task_description_hint"
+                android:importantForAutofill="no"
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLength="1000"
+                android:minLines="3" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/project_label"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinnerTeamTaskProject"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/assignee_label"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinnerTeamTaskAssignee"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_label"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinnerTeamTaskStatus"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/priority_label"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinnerTeamTaskPriority"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+
+            <TextView
+                android:id="@+id/textTeamTaskProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/progress_initial" />
+
+            <SeekBar
+                android:id="@+id/seekTeamTaskProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100" />
+
+            <EditText
+                android:id="@+id/editTeamEstimatedMinutes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/estimated_minutes_hint"
+                android:importantForAutofill="no"
+                android:inputType="number"
+                android:maxLength="6" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonTeamSelectDueDate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/select_due_date" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonTeamClearDueDate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/clear_due_date" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/textTeamSelectedDueDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/no_due_date_selected" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonCancelTeamTask"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/cancel" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonDeleteTeamTask"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/delete" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonSaveTeamTask"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/save_task" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <ProgressBar
+        android:id="@+id/progressTeamTaskForm"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+</FrameLayout>

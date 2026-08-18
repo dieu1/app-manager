@@ -1,0 +1,174 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberPath(workspaceId, userId) {
+      return /databases/$(database)/documents/workspace_members/$(workspaceId + "_" + userId);
+    }
+
+    function isActiveMember(workspaceId) {
+      return signedIn()
+        && exists(memberPath(workspaceId, request.auth.uid))
+        && get(memberPath(workspaceId, request.auth.uid)).data.status == "ACTIVE";
+    }
+
+    function isActiveUser(workspaceId, userId) {
+      return exists(memberPath(workspaceId, userId))
+        && get(memberPath(workspaceId, userId)).data.status == "ACTIVE";
+    }
+
+    function currentRole(workspaceId) {
+      return get(memberPath(workspaceId, request.auth.uid)).data.role;
+    }
+
+    function isOwner(workspaceId) {
+      return isActiveMember(workspaceId) && currentRole(workspaceId) == "OWNER";
+    }
+
+    function isManager(workspaceId) {
+      return isActiveMember(workspaceId)
+        && currentRole(workspaceId) in ["OWNER", "ADMIN"];
+    }
+
+    function isWorkspaceOwnerByDocument(workspaceId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId))
+        && get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.managerId
+          == request.auth.uid;
+    }
+
+    function isWorkspaceOwnerAfterWrite(workspaceId) {
+      return signedIn()
+        && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.managerId
+          == request.auth.uid;
+    }
+
+    function hasValidAssignee(workspaceId, data) {
+      return data.assigneeId == null
+        || isActiveUser(workspaceId, data.assigneeId);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.normalizedEmail == request.auth.token.email
+        && request.resource.data.normalizedUserCode == request.resource.data.userCode
+        && getAfter(
+          /databases/$(database)/documents/user_codes/$(request.resource.data.userCode)
+        ).data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /user_codes/{userCode} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userCode == userCode;
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.userCode == resource.data.userCode;
+      allow delete: if false;
+    }
+
+    match /workspaces/{workspaceId} {
+      allow create: if signedIn()
+        && request.resource.data.managerId == request.auth.uid;
+      allow read: if isActiveMember(workspaceId)
+        || (signedIn() && resource.data.managerId == request.auth.uid);
+      allow update, delete: if isOwner(workspaceId)
+        || (signedIn() && resource.data.managerId == request.auth.uid);
+    }
+
+    match /workspace_members/{membershipId} {
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid
+          || isActiveMember(resource.data.workspaceId));
+      allow create: if signedIn()
+        && membershipId == request.resource.data.workspaceId + "_" + request.resource.data.userId
+        && get(
+          /databases/$(database)/documents/user_codes/$(request.resource.data.userCode)
+        ).data.userId == request.resource.data.userId
+        && (isOwner(request.resource.data.workspaceId)
+          || isWorkspaceOwnerByDocument(request.resource.data.workspaceId)
+          || isWorkspaceOwnerAfterWrite(request.resource.data.workspaceId)
+          || (isManager(request.resource.data.workspaceId)
+            && request.resource.data.role == "MEMBER"));
+      allow update: if signedIn()
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.userId == resource.data.userId
+        && (!("userCode" in resource.data)
+          || request.resource.data.userCode == resource.data.userCode)
+        && get(
+          /databases/$(database)/documents/user_codes/$(request.resource.data.userCode)
+        ).data.userId == request.resource.data.userId
+        && (isOwner(resource.data.workspaceId)
+          || (isManager(resource.data.workspaceId)
+            && resource.data.role == "MEMBER"
+            && request.resource.data.role == resource.data.role));
+      allow delete: if isOwner(resource.data.workspaceId);
+    }
+
+    match /projects/{projectId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isManager(request.resource.data.workspaceId)
+        && isActiveUser(
+          request.resource.data.workspaceId,
+          request.resource.data.createdBy
+        );
+      allow update: if isManager(resource.data.workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isManager(resource.data.workspaceId);
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isActiveMember(request.resource.data.workspaceId)
+        && (request.resource.data.createdBy == request.auth.uid
+          || isManager(request.resource.data.workspaceId))
+        && isActiveUser(
+          request.resource.data.workspaceId,
+          request.resource.data.createdBy
+        )
+        && hasValidAssignee(
+          request.resource.data.workspaceId,
+          request.resource.data
+        );
+      allow update: if isActiveMember(resource.data.workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && hasValidAssignee(
+          request.resource.data.workspaceId,
+          request.resource.data
+        )
+        && (isManager(resource.data.workspaceId)
+          || resource.data.createdBy == request.auth.uid
+          || resource.data.assigneeId == request.auth.uid);
+      allow delete: if isManager(resource.data.workspaceId)
+        || (isActiveMember(resource.data.workspaceId)
+          && resource.data.createdBy == request.auth.uid);
+    }
+
+    match /work_sessions/{sessionId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && isActiveMember(request.resource.data.workspaceId);
+      allow update: if signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.taskId == resource.data.taskId
+        && request.resource.data.workspaceId == resource.data.workspaceId;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}

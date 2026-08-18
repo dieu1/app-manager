@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="task_overdue">#B3261E</color>
+    <color name="task_text_primary">#49454F</color>
+    <color name="task_navy">#17233C</color>
+    <color name="task_primary">#3159D9</color>
+    <color name="task_primary_light">#E8EEFF</color>
+    <color name="task_teal_light">#E4F7F2</color>
+    <color name="task_orange_light">#FFF1E2</color>
+    <color name="task_text_secondary">#687087</color>
+</resources>
