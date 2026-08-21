@@ -10,6 +10,7 @@
     <string name="refresh">Làm mới</string>
     <string name="statistics">Thống kê</string>
     <string name="personal_tasks">Công việc cá nhân</string>
+    <string name="personal_tasks_summary">%1$d công việc · %2$d hoàn thành</string>
     <string name="ascending">Tăng dần</string>
     <string name="empty_tasks">Không tìm thấy công việc</string>
     <string name="personal_workspace_load_error">Không thể mở dữ liệu cá nhân. Vui lòng thử khởi động lại ứng dụng.</string>
@@ -206,4 +207,9 @@
     <string name="team_home_description">Quản lý thành viên, dự án, phân công và Dashboard tiến độ chung.</string>
     <string name="back_to_home">← Về trang chủ</string>
     <string name="profile_subtitle">Thông tin định danh dùng chung trên tất cả thiết bị.</string>
+    <string name="personal_home_desc_short">Lập kế hoạch riêng</string>
+    <string name="team_home_desc_short">Quản lý dự án chung</string>
+    <string name="workspace_group_title">KHÔNG GIAN LÀM VIỆC</string>
+    <string name="percent_sign">%</string>
+    <string name="by_status">THEO TRẠNG THÁI</string>
 </resources>

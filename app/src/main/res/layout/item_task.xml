@@ -1,82 +1,149 @@
-<?xml version="1.0" encoding="utf-8"?>
-
-<LinearLayout
+<com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/layoutTaskItem"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
-    android:layout_marginVertical="6dp"
-    android:foreground="?attr/selectableItemBackground"
+    android:layout_marginVertical="8dp"
     android:clickable="true"
     android:focusable="true"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:id="@+id/textTaskTitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        tools:text="Tên công việc" />
-
-    <TextView
-        android:id="@+id/textTaskDescription"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:maxLines="2"
-        android:textSize="14sp"
-        tools:text="Mô tả công việc" />
+    android:foreground="?attr/selectableItemBackground"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
         android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/textTaskStatus"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textStyle="bold"
-            tools:text="Đang xử lý" />
+        <!-- Status Indicator Strip -->
+        <View
+            android:id="@+id/viewTaskStatusIndicator"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="@color/status_blue"
+            tools:background="@color/status_green" />
 
-        <TextView
-            android:id="@+id/textTaskPriority"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            tools:text="Ưu tiên cao" />
+            android:orientation="vertical"
+            android:padding="16dp">
 
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:id="@+id/textTaskTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/textTaskStatus"
+                    android:layout_marginEnd="8dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/task_navy"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    tools:text="Tên công việc" />
+
+                <!-- Status Badge -->
+                <TextView
+                    android:id="@+id/textTaskStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:background="@drawable/bg_badge_todo"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp"
+                    android:textColor="@color/status_blue"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:text="Chưa xử lý" />
+            </RelativeLayout>
+
+            <TextView
+                android:id="@+id/textTaskDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/task_text_secondary"
+                android:textSize="14sp"
+                tools:text="Mô tả công việc chi tiết hiển thị ở đây để người dùng nắm bắt nhanh..." />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/textTaskPriority"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/task_text_primary"
+                    android:textSize="13sp"
+                    tools:text="Ưu tiên cao" />
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="4dp"
+                    android:layout_marginHorizontal="10dp"
+                    android:background="@color/border_light" />
+
+                <TextView
+                    android:id="@+id/textTaskDueDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/task_text_primary"
+                    android:textSize="13sp"
+                    tools:text="Hạn: 20/08/2026" />
+
+            </LinearLayout>
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:id="@+id/textTaskSubtaskSummary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:textColor="@color/task_text_secondary"
+                    android:textSize="12sp"
+                    tools:text="2/5 bước hoàn thành" />
+
+                <TextView
+                    android:id="@+id/textTaskProgress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:textColor="@color/task_navy"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:text="40%" />
+
+            </RelativeLayout>
+
+            <ProgressBar
+                android:id="@+id/progressTask"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="6dp"
+                android:max="100"
+                android:progressDrawable="@android:drawable/progress_horizontal"
+                android:progressTint="@color/purple_primary"
+                tools:progress="40" />
+
+        </LinearLayout>
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/textTaskDueDate"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textSize="13sp"
-        tools:text="Hạn: 20/08/2026" />
-
-    <ProgressBar
-        android:id="@+id/progressTask"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:max="100"
-        android:progress="30" />
-
-    <TextView
-        android:id="@+id/textTaskProgress"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="end"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        tools:text="30%" />
-
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

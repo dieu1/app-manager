@@ -8,4 +8,16 @@
     <color name="task_teal_light">#E4F7F2</color>
     <color name="task_orange_light">#FFF1E2</color>
     <color name="task_text_secondary">#687087</color>
+
+    <color name="purple_primary">#6C4FD6</color>
+    <color name="purple_light">#8A6FE8</color>
+    <color name="border_light">#E8E4F5</color>
+    <color name="status_green">#2E9E5B</color>
+    <color name="status_green_light">#EAF6ED</color>
+    <color name="status_orange">#FF9800</color>
+    <color name="status_orange_light">#FFF4E5</color>
+    <color name="status_blue">#3B82F6</color>
+    <color name="status_blue_light">#EBF3FF</color>
+    <color name="status_red">#E53935</color>
+    <color name="status_red_light">#FEEBEE</color>
 </resources>

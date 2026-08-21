@@ -148,7 +148,8 @@ public class MainActivity extends AppCompatActivity {
                 currentUser.getDisplayName(),
                 currentUser.getEmail(),
                 currentUser.getUserCode()
-        ));
+            )
+        );
     }
 
     private void showRootFragment(androidx.fragment.app.Fragment fragment) {
