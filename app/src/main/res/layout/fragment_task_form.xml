@@ -64,55 +64,48 @@
             android:layout_height="48dp" />
 
         <TextView
-            android:id="@+id/textFormProgress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/progress_initial" />
+            android:layout_marginTop="16dp"
+            android:text="@string/task_schedule_label"
+            android:textStyle="bold" />
 
-        <SeekBar
-            android:id="@+id/seekTaskProgress"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonSelectStartDateTime"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="0" />
-
-        <EditText
-            android:id="@+id/editEstimatedMinutes"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/estimated_minutes_hint"
-            android:importantForAutofill="no"
-            android:inputType="number" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonSelectDueDate"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:text="@string/select_due_date" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonClearDueDate"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:text="@string/clear_due_date" />
-        </LinearLayout>
+            android:layout_marginTop="8dp"
+            android:text="@string/select_start_datetime" />
 
         <TextView
-            android:id="@+id/textSelectedDueDate"
+            android:id="@+id/textSelectedStartDateTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/no_start_datetime_selected" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonSelectDueDateTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/select_due_datetime" />
+
+        <TextView
+            android:id="@+id/textSelectedDueDateTime"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="@string/no_due_date_selected" />
+
+        <TextView
+            android:id="@+id/textCalculatedDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/calculated_duration_empty"
+            android:textStyle="bold" />
 
         <ProgressBar
             android:id="@+id/progressSavingTask"

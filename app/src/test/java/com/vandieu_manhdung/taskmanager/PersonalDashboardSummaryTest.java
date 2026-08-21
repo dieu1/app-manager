@@ -23,4 +23,12 @@ public class PersonalDashboardSummaryTest {
 
         assertEquals(0, summary.getCompletionRate());
     }
+
+    @Test
+    public void dashboardCanExposeAverageTaskProgress() {
+        PersonalDashboardSummary summary =
+                new PersonalDashboardSummary(2, 1, 1, 0, 0, 0, 40);
+
+        assertEquals(40, summary.getCompletionRate());
+    }
 }

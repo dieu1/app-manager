@@ -158,6 +158,25 @@ service cloud.firestore {
           && resource.data.createdBy == request.auth.uid);
     }
 
+    match /task_subtasks/{subtaskId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isActiveMember(request.resource.data.workspaceId)
+        && request.resource.data.subtaskId == subtaskId
+        && request.resource.data.createdBy == request.auth.uid
+        && exists(/databases/$(database)/documents/tasks/$(request.resource.data.taskId))
+        && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.workspaceId
+          == request.resource.data.workspaceId
+        && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.createdBy
+          == request.auth.uid;
+      allow update: if isActiveMember(resource.data.workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.taskId == resource.data.taskId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && resource.data.createdBy == request.auth.uid;
+      allow delete: if isActiveMember(resource.data.workspaceId)
+        && resource.data.createdBy == request.auth.uid;
+    }
+
     match /work_sessions/{sessionId} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;
       allow create: if signedIn()

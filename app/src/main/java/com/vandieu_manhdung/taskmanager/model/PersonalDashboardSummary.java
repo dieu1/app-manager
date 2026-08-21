@@ -8,6 +8,7 @@ public class PersonalDashboardSummary {
     private final int completed;
     private final int cancelled;
     private final int overdue;
+    private final int completionRate;
 
     public PersonalDashboardSummary(
             int total,
@@ -17,12 +18,33 @@ public class PersonalDashboardSummary {
             int cancelled,
             int overdue
     ) {
+        this(
+                total,
+                todo,
+                inProgress,
+                completed,
+                cancelled,
+                overdue,
+                total == 0 ? 0 : Math.round(completed * 100f / total)
+        );
+    }
+
+    public PersonalDashboardSummary(
+            int total,
+            int todo,
+            int inProgress,
+            int completed,
+            int cancelled,
+            int overdue,
+            int completionRate
+    ) {
         this.total = total;
         this.todo = todo;
         this.inProgress = inProgress;
         this.completed = completed;
         this.cancelled = cancelled;
         this.overdue = overdue;
+        this.completionRate = Math.max(0, Math.min(100, completionRate));
     }
 
     public int getTotal() {
@@ -50,10 +72,6 @@ public class PersonalDashboardSummary {
     }
 
     public int getCompletionRate() {
-        if (total == 0) {
-            return 0;
-        }
-
-        return Math.round(completed * 100f / total);
+        return completionRate;
     }
 }

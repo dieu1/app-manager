@@ -1,9 +1,14 @@
 package com.vandieu_manhdung.taskmanager.ui.main;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -12,6 +17,8 @@ import android.widget.Toast;
 
 import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
+import com.vandieu_manhdung.taskmanager.core.notification.TaskNotificationManager;
+import com.vandieu_manhdung.taskmanager.core.notification.TaskReminderScheduler;
 import com.vandieu_manhdung.taskmanager.data.reponsitory.AuthRepository;
 import com.vandieu_manhdung.taskmanager.data.reponsitory.WorkspaceRepository;
 import com.vandieu_manhdung.taskmanager.data.remote.CloudSyncManager;
@@ -28,6 +35,8 @@ import com.vandieu_manhdung.taskmanager.ui.team.TeamListFragment;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int REQUEST_NOTIFICATIONS = 2001;
+
     private AuthRepository authRepository;
     private User currentUser;
     private Workspace personalWorkspace;
@@ -37,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
+        TaskNotificationManager.createChannel(this);
         authRepository = new AuthRepository(this);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -71,7 +81,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onAuthenticated(User user) {
+        requestNotificationPermissionIfNeeded();
         initializeApplication(user);
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQUEST_NOTIFICATIONS
+            );
+        }
     }
 
     public void signOut() {
@@ -157,6 +180,7 @@ public class MainActivity extends AppCompatActivity {
 
                 currentUser = user;
                 personalWorkspace = workspace;
+                new TaskReminderScheduler(this).rescheduleAll();
 
                 runOnUiThread(() -> CloudSyncManager.getInstance(this).start(
                         user.getUserId(),

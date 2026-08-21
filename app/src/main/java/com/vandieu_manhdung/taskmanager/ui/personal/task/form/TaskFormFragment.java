@@ -1,16 +1,15 @@
 package com.vandieu_manhdung.taskmanager.ui.personal.task.form;
 
 import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
-import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,6 +22,8 @@ import androidx.lifecycle.ViewModelProvider;
 import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskPriority;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
+import com.vandieu_manhdung.taskmanager.core.util.TaskScheduleRules;
+import com.vandieu_manhdung.taskmanager.ui.personal.task.detail.TaskDetailFragment;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -34,22 +35,23 @@ public class TaskFormFragment extends Fragment {
     private static final String ARG_WORKSPACE_ID = "workspace_id";
     private static final String ARG_USER_ID = "user_id";
     private static final String ARG_TASK_ID = "task_id";
+    private static final String STATE_START_DATE = "selected_start_date";
     private static final String STATE_DUE_DATE = "selected_due_date";
 
     private String workspaceId;
     private String userId;
     private String taskId;
 
+    private long selectedStartDate;
     private long selectedDueDate;
 
     private EditText editTitle;
     private EditText editDescription;
-    private EditText editEstimatedMinutes;
     private Spinner spinnerStatus;
     private Spinner spinnerPriority;
-    private SeekBar seekProgress;
-    private TextView textProgress;
+    private TextView textStartDate;
     private TextView textDueDate;
+    private TextView textDuration;
     private TextView textFormTitle;
     private Button buttonSave;
     private ProgressBar progressSaving;
@@ -122,6 +124,10 @@ public class TaskFormFragment extends Fragment {
         taskId = requireArguments().getString(ARG_TASK_ID);
 
         if (savedInstanceState != null) {
+            selectedStartDate = savedInstanceState.getLong(
+                    STATE_START_DATE,
+                    0
+            );
             selectedDueDate = savedInstanceState.getLong(
                     STATE_DUE_DATE,
                     0
@@ -132,7 +138,6 @@ public class TaskFormFragment extends Fragment {
 
         bindViews(view);
         setupSpinners();
-        setupProgress();
         setupViewModel();
 
         boolean editing = taskId != null && !taskId.isBlank();
@@ -141,22 +146,22 @@ public class TaskFormFragment extends Fragment {
                 : R.string.add_task);
         buttonSave.setText(editing
                 ? R.string.save_changes
-                : R.string.save_task);
+                : R.string.save_task_and_add_steps);
 
-        if (selectedDueDate > 0) {
-            displayDueDate();
+        if (!editing && savedInstanceState == null) {
+            initializeDefaultSchedule();
         }
+        displaySchedule();
 
-        view.findViewById(R.id.buttonSelectDueDate)
+        view.findViewById(R.id.buttonSelectStartDateTime)
                 .setOnClickListener(
-                        button -> openDatePicker()
+                        button -> openDateTimePicker(true)
                 );
 
-        view.findViewById(R.id.buttonClearDueDate)
-                .setOnClickListener(button -> {
-                    selectedDueDate = 0;
-                    textDueDate.setText(R.string.no_due_date_selected);
-                });
+        view.findViewById(R.id.buttonSelectDueDateTime)
+                .setOnClickListener(
+                        button -> openDateTimePicker(false)
+                );
 
         view.findViewById(R.id.buttonCancelTask)
                 .setOnClickListener(
@@ -178,10 +183,6 @@ public class TaskFormFragment extends Fragment {
                 R.id.editTaskDescription
         );
 
-        editEstimatedMinutes = view.findViewById(
-                R.id.editEstimatedMinutes
-        );
-
         spinnerStatus = view.findViewById(
                 R.id.spinnerTaskStatus
         );
@@ -190,17 +191,9 @@ public class TaskFormFragment extends Fragment {
                 R.id.spinnerTaskPriority
         );
 
-        seekProgress = view.findViewById(
-                R.id.seekTaskProgress
-        );
-
-        textProgress = view.findViewById(
-                R.id.textFormProgress
-        );
-
-        textDueDate = view.findViewById(
-                R.id.textSelectedDueDate
-        );
+        textStartDate = view.findViewById(R.id.textSelectedStartDateTime);
+        textDueDate = view.findViewById(R.id.textSelectedDueDateTime);
+        textDuration = view.findViewById(R.id.textCalculatedDuration);
 
         buttonSave = view.findViewById(
                 R.id.buttonSaveTask
@@ -243,35 +236,6 @@ public class TaskFormFragment extends Fragment {
 
         spinnerStatus.setAdapter(statusAdapter);
 
-        spinnerStatus.setOnItemSelectedListener(
-                new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(
-                            AdapterView<?> parent,
-                            View view,
-                            int position,
-                            long id
-                    ) {
-                        if (position == 0) {
-                            seekProgress.setProgress(0);
-                            seekProgress.setEnabled(false);
-                        } else if (position == 2) {
-                            seekProgress.setProgress(100);
-                            seekProgress.setEnabled(false);
-                        } else {
-                            seekProgress.setEnabled(true);
-                            if (position == 1 && seekProgress.getProgress() == 0) {
-                                seekProgress.setProgress(1);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onNothingSelected(AdapterView<?> parent) {
-                    }
-                }
-        );
-
         ArrayAdapter<String> priorityAdapter =
                 new ArrayAdapter<>(
                         requireContext(),
@@ -287,38 +251,6 @@ public class TaskFormFragment extends Fragment {
 
         // Mặc định độ ưu tiên vừa.
         spinnerPriority.setSelection(1);
-    }
-
-    private void setupProgress() {
-        seekProgress.setOnSeekBarChangeListener(
-                new SeekBar.OnSeekBarChangeListener() {
-                    @Override
-                    public void onProgressChanged(
-                            SeekBar seekBar,
-                            int progress,
-                            boolean fromUser
-                    ) {
-                        textProgress.setText(
-                                getString(
-                                        R.string.progress_value,
-                                        progress
-                                )
-                        );
-                    }
-
-                    @Override
-                    public void onStartTrackingTouch(
-                            SeekBar seekBar
-                    ) {
-                    }
-
-                    @Override
-                    public void onStopTrackingTouch(
-                            SeekBar seekBar
-                    ) {
-                    }
-                }
-        );
     }
 
     private void setupViewModel() {
@@ -369,8 +301,23 @@ public class TaskFormFragment extends Fragment {
 
                     viewModel.clearSavedTask();
 
-                    getParentFragmentManager()
-                            .popBackStack();
+                    if (taskId == null || taskId.isBlank()) {
+                        getParentFragmentManager().popBackStackImmediate();
+                        getParentFragmentManager()
+                                .beginTransaction()
+                                .replace(
+                                        R.id.main,
+                                        TaskDetailFragment.newInstance(
+                                                workspaceId,
+                                                userId,
+                                                task.getTaskId()
+                                        )
+                                )
+                                .addToBackStack("task_detail")
+                                .commit();
+                    } else {
+                        getParentFragmentManager().popBackStack();
+                    }
                 }
         );
 
@@ -399,14 +346,11 @@ public class TaskFormFragment extends Fragment {
     private void populateForm(com.vandieu_manhdung.taskmanager.model.Task task) {
         editTitle.setText(task.getTitle());
         editDescription.setText(task.getDescription());
-        editEstimatedMinutes.setText(
-                String.valueOf(task.getEstimatedMinutes())
-        );
         spinnerStatus.setSelection(statusPosition(task.getStatus()));
         spinnerPriority.setSelection(priorityPosition(task.getPriority()));
-        seekProgress.setProgress(task.getProgress());
+        selectedStartDate = task.getStartDate();
         selectedDueDate = task.getDueDate();
-        displayDueDate();
+        displaySchedule();
     }
 
     private int statusPosition(String status) {
@@ -435,61 +379,87 @@ public class TaskFormFragment extends Fragment {
         return 1;
     }
 
-    private void openDatePicker() {
+    private void initializeDefaultSchedule() {
         Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.MINUTE, 15);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        selectedStartDate = calendar.getTimeInMillis();
+        calendar.add(Calendar.HOUR_OF_DAY, 1);
+        selectedDueDate = calendar.getTimeInMillis();
+    }
+
+    private void openDateTimePicker(boolean selectingStart) {
+        long currentValue = selectingStart ? selectedStartDate : selectedDueDate;
+        Calendar calendar = Calendar.getInstance();
+        if (currentValue > 0) {
+            calendar.setTimeInMillis(currentValue);
+        }
 
         DatePickerDialog dialog =
                 new DatePickerDialog(
                         requireContext(),
                         (datePicker, year, month, day) -> {
-                            Calendar selected =
-                                    Calendar.getInstance();
-
-                            selected.set(
-                                    year,
-                                    month,
-                                    day,
-                                    23,
-                                    59,
-                                    59
-                            );
-
-                            selected.set(
-                                    Calendar.MILLISECOND,
-                                    999
-                            );
-
-                            selectedDueDate =
-                                    selected.getTimeInMillis();
-
-                            displayDueDate();
+                            new TimePickerDialog(
+                                    requireContext(),
+                                    (timePicker, hour, minute) -> {
+                                        Calendar selected = Calendar.getInstance();
+                                        selected.set(year, month, day, hour, minute, 0);
+                                        selected.set(Calendar.MILLISECOND, 0);
+                                        if (selectingStart) {
+                                            selectedStartDate = selected.getTimeInMillis();
+                                            if (selectedDueDate <= selectedStartDate) {
+                                                selectedDueDate = selectedStartDate + 60 * 60 * 1000L;
+                                            }
+                                        } else {
+                                            selectedDueDate = selected.getTimeInMillis();
+                                        }
+                                        displaySchedule();
+                                    },
+                                    calendar.get(Calendar.HOUR_OF_DAY),
+                                    calendar.get(Calendar.MINUTE),
+                                    true
+                            ).show();
                         },
                         calendar.get(Calendar.YEAR),
                         calendar.get(Calendar.MONTH),
                         calendar.get(Calendar.DAY_OF_MONTH)
                 );
 
-        dialog.getDatePicker().setMinDate(
-                System.currentTimeMillis() - 1000
-        );
-
         dialog.show();
     }
 
-    private void displayDueDate() {
-        if (selectedDueDate <= 0) {
-            textDueDate.setText(R.string.no_due_date_selected);
-            return;
-        }
-
+    private void displaySchedule() {
         SimpleDateFormat formatter = new SimpleDateFormat(
-                "dd/MM/yyyy",
+                "dd/MM/yyyy HH:mm",
                 Locale.getDefault()
         );
-        textDueDate.setText(getString(
-                R.string.selected_due_date,
-                formatter.format(new Date(selectedDueDate))
-        ));
+        textStartDate.setText(selectedStartDate <= 0
+                ? getString(R.string.no_start_datetime_selected)
+                : getString(R.string.selected_start_datetime,
+                formatter.format(new Date(selectedStartDate))));
+        textDueDate.setText(selectedDueDate <= 0
+                ? getString(R.string.no_due_date_selected)
+                : getString(R.string.selected_due_datetime,
+                formatter.format(new Date(selectedDueDate))));
+        int minutes = TaskScheduleRules.calculateEstimatedMinutes(
+                selectedStartDate,
+                selectedDueDate
+        );
+        textDuration.setText(minutes <= 0
+                ? getString(R.string.calculated_duration_empty)
+                : getString(R.string.calculated_duration, formatDuration(minutes)));
+    }
+
+    private String formatDuration(int totalMinutes) {
+        int days = totalMinutes / (24 * 60);
+        int hours = (totalMinutes % (24 * 60)) / 60;
+        int minutes = totalMinutes % 60;
+        StringBuilder value = new StringBuilder();
+        if (days > 0) value.append(days).append(" ngày ");
+        if (hours > 0) value.append(hours).append(" giờ ");
+        if (minutes > 0 || value.length() == 0) value.append(minutes).append(" phút");
+        return value.toString().trim();
     }
 
     private void saveTask() {
@@ -510,24 +480,13 @@ public class TaskFormFragment extends Fragment {
             return;
         }
 
-        int estimatedMinutes = 0;
-
-        String estimatedValue =
-                editEstimatedMinutes.getText()
-                        .toString()
-                        .trim();
-
-        if (!estimatedValue.isEmpty()) {
-            try {
-                estimatedMinutes =
-                        Integer.parseInt(estimatedValue);
-            } catch (NumberFormatException exception) {
-                editEstimatedMinutes.setError(
-                        "Thời gian không hợp lệ"
-                );
-
-                return;
-            }
+        if (selectedStartDate <= 0 || selectedDueDate <= selectedStartDate) {
+            Toast.makeText(
+                    requireContext(),
+                    R.string.invalid_task_schedule,
+                    Toast.LENGTH_LONG
+            ).show();
+            return;
         }
 
         String status = switch (
@@ -556,14 +515,14 @@ public class TaskFormFragment extends Fragment {
                 description,
                 status,
                 priority,
-                seekProgress.getProgress(),
-                selectedDueDate,
-                estimatedMinutes
+                selectedStartDate,
+                selectedDueDate
         );
     }
 
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
+        outState.putLong(STATE_START_DATE, selectedStartDate);
         outState.putLong(STATE_DUE_DATE, selectedDueDate);
         super.onSaveInstanceState(outState);
     }

@@ -1,10 +1,13 @@
 package com.vandieu_manhdung.taskmanager.ui.personal.task.detail;
 
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -15,18 +18,22 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskPriority;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
 import com.vandieu_manhdung.taskmanager.core.util.TaskRules;
+import com.vandieu_manhdung.taskmanager.core.util.TaskSubtaskRules;
 import com.vandieu_manhdung.taskmanager.model.Task;
+import com.vandieu_manhdung.taskmanager.model.TaskSubtask;
 import com.vandieu_manhdung.taskmanager.ui.personal.task.form.TaskFormFragment;
-import com.vandieu_manhdung.taskmanager.ui.personal.task.timer.WorkTimerFragment;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.List;
 
 public class TaskDetailFragment extends Fragment {
 
@@ -47,12 +54,18 @@ public class TaskDetailFragment extends Fragment {
     private TextView status;
     private TextView priority;
     private TextView progressText;
+    private TextView subtasksSummary;
+    private TextView subtasksEmpty;
     private TextView startDate;
     private TextView dueDate;
     private TextView estimatedTime;
     private TextView updatedAt;
     private Button editButton;
     private Button deleteButton;
+    private Button addSubtaskButton;
+    private RecyclerView subtasksRecycler;
+    private TaskSubtaskAdapter subtaskAdapter;
+    private List<TaskSubtask> currentSubtasks = java.util.Collections.emptyList();
     private Task currentTask;
 
     public static TaskDetailFragment newInstance(
@@ -98,15 +111,14 @@ public class TaskDetailFragment extends Fragment {
                         getParentFragmentManager().popBackStack());
         editButton.setOnClickListener(ignored -> openEditForm());
         deleteButton.setOnClickListener(ignored -> confirmDelete());
-        view.findViewById(R.id.buttonWorkTimer)
-                .setOnClickListener(ignored -> openWorkTimer());
+        addSubtaskButton.setOnClickListener(ignored -> showAddSubtaskDialog());
     }
 
     @Override
     public void onResume() {
         super.onResume();
         if (viewModel != null && taskId != null) {
-            viewModel.loadTask(taskId);
+            viewModel.loadDetails(taskId, userId);
         }
     }
 
@@ -119,18 +131,36 @@ public class TaskDetailFragment extends Fragment {
         status = view.findViewById(R.id.textTaskDetailStatus);
         priority = view.findViewById(R.id.textTaskDetailPriority);
         progressText = view.findViewById(R.id.textTaskDetailProgress);
+        subtasksSummary = view.findViewById(R.id.textTaskDetailSubtasksSummary);
+        subtasksEmpty = view.findViewById(R.id.textTaskSubtasksEmpty);
         startDate = view.findViewById(R.id.textTaskDetailStartDate);
         dueDate = view.findViewById(R.id.textTaskDetailDueDate);
         estimatedTime = view.findViewById(R.id.textTaskDetailEstimated);
         updatedAt = view.findViewById(R.id.textTaskDetailUpdatedAt);
         editButton = view.findViewById(R.id.buttonEditTask);
         deleteButton = view.findViewById(R.id.buttonDeleteTask);
+        addSubtaskButton = view.findViewById(R.id.buttonAddSubtask);
+        subtasksRecycler = view.findViewById(R.id.recyclerTaskSubtasks);
+        subtaskAdapter = new TaskSubtaskAdapter(new TaskSubtaskAdapter.Listener() {
+            @Override
+            public void onToggle(TaskSubtask subtask, boolean completed) {
+                viewModel.toggleSubtask(taskId, userId, subtask.getSubtaskId(), completed);
+            }
+
+            @Override
+            public void onDelete(TaskSubtask subtask) {
+                confirmDeleteSubtask(subtask);
+            }
+        });
+        subtasksRecycler.setLayoutManager(new LinearLayoutManager(requireContext()));
+        subtasksRecycler.setAdapter(subtaskAdapter);
     }
 
     private void setupViewModel() {
         viewModel = new ViewModelProvider(this).get(TaskDetailViewModel.class);
 
         viewModel.getTask().observe(getViewLifecycleOwner(), this::renderTask);
+        viewModel.getSubtasks().observe(getViewLifecycleOwner(), this::renderSubtasks);
         viewModel.getLoading().observe(getViewLifecycleOwner(), isLoading -> {
             boolean visible = Boolean.TRUE.equals(isLoading);
             loading.setVisibility(visible ? View.VISIBLE : View.GONE);
@@ -188,11 +218,11 @@ public class TaskDetailFragment extends Fragment {
         ));
         startDate.setText(getString(
                 R.string.task_detail_start_date,
-                formatDate(task.getStartDate())
+                formatDateTime(task.getStartDate())
         ));
 
         boolean overdue = TaskRules.isOverdue(task, System.currentTimeMillis());
-        String dueDateValue = formatDate(task.getDueDate());
+        String dueDateValue = formatDateTime(task.getDueDate());
         dueDate.setText(overdue
                 ? getString(R.string.task_detail_overdue, dueDateValue)
                 : getString(R.string.task_detail_due_date, dueDateValue));
@@ -203,12 +233,13 @@ public class TaskDetailFragment extends Fragment {
 
         estimatedTime.setText(getString(
                 R.string.task_detail_estimated,
-                task.getEstimatedMinutes()
+                formatDuration(task.getEstimatedMinutes())
         ));
         updatedAt.setText(getString(
                 R.string.task_detail_updated_at,
                 formatDateTime(task.getUpdatedAt())
         ));
+        renderSubtaskProgress();
     }
 
     private void openEditForm() {
@@ -238,33 +269,101 @@ public class TaskDetailFragment extends Fragment {
                 .show();
     }
 
-    private void openWorkTimer() {
+    private void renderSubtasks(List<TaskSubtask> value) {
+        currentSubtasks = value == null ? java.util.Collections.emptyList() : value;
+        subtaskAdapter.submitList(currentSubtasks);
+        subtasksEmpty.setVisibility(currentSubtasks.isEmpty() ? View.VISIBLE : View.GONE);
+        renderSubtaskProgress();
+    }
+
+    private void renderSubtaskProgress() {
         if (currentTask == null) {
             return;
         }
-
-        getParentFragmentManager()
-                .beginTransaction()
-                .replace(
-                        R.id.main,
-                        WorkTimerFragment.newInstance(
-                                taskId,
-                                userId,
-                                currentTask.getTitle()
-                        )
-                )
-                .addToBackStack("work_timer")
-                .commit();
+        if (currentSubtasks.isEmpty()) {
+            progress.setProgress(currentTask.getProgress());
+            progressText.setText(getString(
+                    R.string.task_detail_progress,
+                    currentTask.getProgress()
+            ));
+            subtasksSummary.setText(getString(
+                    R.string.task_detail_manual_progress,
+                    currentTask.getProgress()
+            ));
+            return;
+        }
+        int completed = TaskSubtaskRules.completedCount(currentSubtasks);
+        int autoProgress = TaskSubtaskRules.calculateProgress(currentSubtasks);
+        progress.setProgress(autoProgress);
+        progressText.setText(getString(R.string.task_detail_auto_progress, autoProgress));
+        subtasksSummary.setText(getString(
+                R.string.task_detail_subtasks_summary,
+                completed,
+                currentSubtasks.size()
+        ));
     }
 
-    private String formatDate(long value) {
-        if (value <= 0) {
-            return getString(R.string.no_due_date);
-        }
-        return new SimpleDateFormat(
-                "dd/MM/yyyy",
-                Locale.getDefault()
-        ).format(new Date(value));
+    private void showAddSubtaskDialog() {
+        LinearLayout form = new LinearLayout(requireContext());
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        form.setPadding(padding, 0, padding, 0);
+
+        EditText titleInput = new EditText(requireContext());
+        titleInput.setHint(R.string.subtask_title_hint);
+        form.addView(titleInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        EditText estimateInput = new EditText(requireContext());
+        estimateInput.setHint(R.string.subtask_estimated_hint);
+        estimateInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        form.addView(estimateInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.subtask_add_title)
+                .setView(form)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.add, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(button -> {
+                    String titleValue = titleInput.getText().toString().trim();
+                    if (titleValue.isEmpty()) {
+                        titleInput.setError(getString(R.string.task_title_required));
+                        return;
+                    }
+                    int estimate = 0;
+                    String estimateValue = estimateInput.getText().toString().trim();
+                    if (!estimateValue.isEmpty()) {
+                        try {
+                            estimate = Integer.parseInt(estimateValue);
+                        } catch (NumberFormatException exception) {
+                            estimateInput.setError(getString(R.string.invalid_estimated_minutes));
+                            return;
+                        }
+                    }
+                    viewModel.createSubtask(taskId, userId, titleValue, estimate);
+                    Toast.makeText(requireContext(), R.string.subtask_saved, Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                }));
+        dialog.show();
+    }
+
+    private void confirmDeleteSubtask(TaskSubtask subtask) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.subtask_delete_title)
+                .setMessage(R.string.subtask_delete_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.delete, (dialog, which) -> {
+                    viewModel.deleteSubtask(taskId, userId, subtask.getSubtaskId());
+                    Toast.makeText(requireContext(), R.string.subtask_deleted, Toast.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
     private String formatDateTime(long value) {
@@ -275,6 +374,20 @@ public class TaskDetailFragment extends Fragment {
                 "dd/MM/yyyy HH:mm",
                 Locale.getDefault()
         ).format(new Date(value));
+    }
+
+    private String formatDuration(int totalMinutes) {
+        if (totalMinutes <= 0) {
+            return "-";
+        }
+        int days = totalMinutes / (24 * 60);
+        int hours = (totalMinutes % (24 * 60)) / 60;
+        int minutes = totalMinutes % 60;
+        StringBuilder value = new StringBuilder();
+        if (days > 0) value.append(days).append(" ngày ");
+        if (hours > 0) value.append(hours).append(" giờ ");
+        if (minutes > 0 || value.length() == 0) value.append(minutes).append(" phút");
+        return value.toString().trim();
     }
 
     private String formatStatus(String value) {

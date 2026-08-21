@@ -5,9 +5,12 @@ import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskPriority;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
 import com.vandieu_manhdung.taskmanager.core.constant.WorkspaceType;
+import com.vandieu_manhdung.taskmanager.core.notification.TaskReminderScheduler;
 import com.vandieu_manhdung.taskmanager.core.util.AppExecutors;
 import com.vandieu_manhdung.taskmanager.core.util.TaskRules;
+import com.vandieu_manhdung.taskmanager.core.util.TaskSubtaskRules;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.TaskSubtaskDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.WorkspaceDao;
 import com.vandieu_manhdung.taskmanager.data.remote.CloudSyncManager;
 import com.vandieu_manhdung.taskmanager.model.PersonalDashboardSummary;
@@ -21,18 +24,22 @@ import java.util.concurrent.Callable;
 public class TaskRepository {
 
     private final TaskDao taskDao;
+    private final TaskSubtaskDao subtaskDao;
     private final WorkspaceDao workspaceDao;
     private final AppExecutors executors;
     private final CloudSyncManager cloudSync;
+    private final TaskReminderScheduler reminderScheduler;
 
     public TaskRepository(Context context) {
         Context applicationContext =
                 context.getApplicationContext();
 
         taskDao = new TaskDao(applicationContext);
+        subtaskDao = new TaskSubtaskDao(applicationContext);
         workspaceDao = new WorkspaceDao(applicationContext);
         executors = AppExecutors.getInstance();
         cloudSync = CloudSyncManager.getInstance(applicationContext);
+        reminderScheduler = new TaskReminderScheduler(applicationContext);
     }
 
     /*
@@ -57,6 +64,7 @@ public class TaskRepository {
             }
 
             cloudSync.upsertTask(task, task.getCreatedBy());
+            reminderScheduler.schedule(task);
             return task;
         }, callback);
     }
@@ -106,6 +114,7 @@ public class TaskRepository {
             );
 
             prepareCommonFields(task);
+            applyAutomaticProgressIfNeeded(task);
             validatePersonalOwnership(task);
 
             task.setUpdatedAt(
@@ -121,6 +130,7 @@ public class TaskRepository {
             }
 
             cloudSync.upsertTask(task, task.getCreatedBy());
+            reminderScheduler.schedule(task);
             return task;
         }, callback);
     }
@@ -161,6 +171,7 @@ public class TaskRepository {
             }
 
             cloudSync.deleteTask(taskId);
+            reminderScheduler.cancel(taskId);
             return true;
         }, callback);
     }
@@ -271,13 +282,22 @@ public class TaskRepository {
 
             ensurePersonalTask(existingTask);
 
+            String normalizedStatus = status;
             int normalizedProgress =
-                    normalizeProgress(status, progress);
+                    normalizeProgress(normalizedStatus, progress);
+
+            List<com.vandieu_manhdung.taskmanager.model.TaskSubtask> subtasks =
+                    subtaskDao.findAllByTask(taskId);
+            if (!subtasks.isEmpty()) {
+                TaskSubtaskRules.applyToTask(existingTask, subtasks);
+                normalizedStatus = existingTask.getStatus();
+                normalizedProgress = existingTask.getProgress();
+            }
 
             int updatedRows =
                     taskDao.updateStatusAndProgress(
                             taskId,
-                            status,
+                            normalizedStatus,
                             normalizedProgress
                     );
 
@@ -287,7 +307,7 @@ public class TaskRepository {
                 );
             }
 
-            existingTask.setStatus(status);
+            existingTask.setStatus(normalizedStatus);
             existingTask.setProgress(
                     normalizedProgress
             );
@@ -297,6 +317,7 @@ public class TaskRepository {
             );
 
             cloudSync.upsertTask(existingTask, existingTask.getCreatedBy());
+            reminderScheduler.schedule(existingTask);
             return existingTask;
         }, callback);
     }
@@ -386,7 +407,8 @@ public class TaskRepository {
                     taskDao.countOverduePersonalTasks(
                             workspaceId,
                             currentTime
-                    )
+                    ),
+                    taskDao.averagePersonalProgress(workspaceId)
             );
         }, callback);
     }
@@ -581,6 +603,20 @@ public class TaskRepository {
             int progress
     ) {
         return TaskRules.normalizeProgress(status, progress);
+    }
+
+    private void applyAutomaticProgressIfNeeded(Task task) {
+        List<com.vandieu_manhdung.taskmanager.model.TaskSubtask> subtasks =
+                subtaskDao.findAllByTask(task.getTaskId());
+        if (!subtasks.isEmpty()) {
+            TaskSubtaskRules.applyToTask(task, subtasks);
+        }
+
+        if (task.getStartDate() <= 0 || task.getDueDate() <= 0) {
+            throw new IllegalArgumentException(
+                    "Vui lòng chọn đầy đủ thời gian bắt đầu và kết thúc"
+            );
+        }
     }
 
     /*

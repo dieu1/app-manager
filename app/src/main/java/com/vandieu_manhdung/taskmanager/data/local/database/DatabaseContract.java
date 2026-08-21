@@ -58,6 +58,24 @@ public final class DatabaseContract {
         }
     }
 
+    public static final class TaskSubtaskTable {
+        public static final String TABLE_NAME = "task_subtasks";
+
+        public static final String SUBTASK_ID = "subtask_id";
+        public static final String TASK_ID = "task_id";
+        public static final String WORKSPACE_ID = "workspace_id";
+        public static final String CREATED_BY = "created_by";
+        public static final String TITLE = "title";
+        public static final String ESTIMATED_MINUTES = "estimated_minutes";
+        public static final String COMPLETED = "completed";
+        public static final String SORT_ORDER = "sort_order";
+        public static final String CREATED_AT = "created_at";
+        public static final String UPDATED_AT = "updated_at";
+
+        private TaskSubtaskTable() {
+        }
+    }
+
     public static final class WorkSessionTable {
         public static final String TABLE_NAME = "work_sessions";
 

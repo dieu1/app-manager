@@ -423,6 +423,49 @@ public class TaskDao {
         return 0;
     }
 
+    public List<Task> findAllScheduledTasks(long now) {
+        SQLiteDatabase database = databaseHelper.getReadableDatabase();
+        List<Task> result = new ArrayList<>();
+        String selection = "(" + TaskTable.PROJECT_ID + " IS NULL OR " +
+                TaskTable.PROJECT_ID + " = '') AND (" +
+                TaskTable.START_DATE + " > ? OR " +
+                TaskTable.DUE_DATE + " > ?) AND " +
+                TaskTable.STATUS + " NOT IN (?, ?)";
+        try (Cursor cursor = database.query(
+                TaskTable.TABLE_NAME,
+                null,
+                selection,
+                new String[]{
+                        String.valueOf(now),
+                        String.valueOf(now),
+                        TaskStatus.COMPLETED,
+                        TaskStatus.CANCELLED
+                },
+                null,
+                null,
+                TaskTable.START_DATE + " ASC"
+        )) {
+            while (cursor.moveToNext()) {
+                result.add(mapCursorToTask(cursor));
+            }
+        }
+        return result;
+    }
+
+    public int averagePersonalProgress(String workspaceId) {
+        String sql = "SELECT COALESCE(ROUND(AVG(" + TaskTable.PROGRESS + ")), 0) " +
+                "FROM " + TaskTable.TABLE_NAME +
+                " WHERE " + TaskTable.WORKSPACE_ID + " = ? AND " +
+                TaskTable.PROJECT_ID + " IS NULL AND " +
+                TaskTable.STATUS + " != ?";
+        try (Cursor cursor = databaseHelper.getReadableDatabase().rawQuery(
+                sql,
+                new String[]{workspaceId, TaskStatus.CANCELLED}
+        )) {
+            return cursor.moveToFirst() ? cursor.getInt(0) : 0;
+        }
+    }
+
     /*
      * =========================================================
      * CHUYỂN TASK THÀNH CONTENT VALUES

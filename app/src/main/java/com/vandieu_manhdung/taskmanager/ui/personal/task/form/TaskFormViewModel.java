@@ -9,6 +9,7 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.data.reponsitory.TaskRepository;
+import com.vandieu_manhdung.taskmanager.core.util.TaskScheduleRules;
 import com.vandieu_manhdung.taskmanager.model.Task;
 
 public class TaskFormViewModel extends AndroidViewModel {
@@ -75,9 +76,8 @@ public class TaskFormViewModel extends AndroidViewModel {
             String description,
             String status,
             String priority,
-            int progress,
-            long dueDate,
-            int estimatedMinutes
+            long startDate,
+            long dueDate
     ) {
         boolean editing = taskId != null && !taskId.isBlank();
         Task task = editing ? editingTask.getValue() : new Task();
@@ -91,16 +91,21 @@ public class TaskFormViewModel extends AndroidViewModel {
             task.setWorkspaceId(workspaceId);
             task.setCreatedBy(userId);
             task.setProjectId(null);
-            task.setStartDate(System.currentTimeMillis());
         }
 
         task.setTitle(title);
         task.setDescription(description);
         task.setStatus(status);
         task.setPriority(priority);
-        task.setProgress(progress);
+        if (!editing) {
+            task.setProgress(0);
+        }
+        task.setStartDate(startDate);
         task.setDueDate(dueDate);
-        task.setEstimatedMinutes(estimatedMinutes);
+        task.setEstimatedMinutes(TaskScheduleRules.calculateEstimatedMinutes(
+                startDate,
+                dueDate
+        ));
 
         saving.setValue(true);
 

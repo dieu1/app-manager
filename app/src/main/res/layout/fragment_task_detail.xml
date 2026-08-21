@@ -63,6 +63,43 @@
                 android:max="100" />
 
             <TextView
+                android:id="@+id/textTaskDetailSubtasksSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/textTaskSubtasksTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/task_subtasks_title"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/buttonAddSubtask"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/add_subtask" />
+
+            <TextView
+                android:id="@+id/textTaskSubtasksEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/subtask_empty" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerTaskSubtasks"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never" />
+
+            <TextView
                 android:id="@+id/textTaskDetailStartDate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -86,13 +123,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" />
-
-            <Button
-                android:id="@+id/buttonWorkTimer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/work_timer" />
 
             <LinearLayout
                 android:layout_width="match_parent"

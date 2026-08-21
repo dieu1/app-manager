@@ -13,7 +13,7 @@ import static com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContr
 public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "task_manager.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     private static volatile TaskManagerDatabaseHelper instance;
 
@@ -99,6 +99,31 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE, " +
 
                     "FOREIGN KEY (" + WorkSessionTable.USER_ID + ") " +
+                    "REFERENCES " + UserTable.TABLE_NAME +
+                    "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
+                    ")";
+
+    private static final String CREATE_TASK_SUBTASKS_TABLE =
+            "CREATE TABLE " + TaskSubtaskTable.TABLE_NAME + " (" +
+                    TaskSubtaskTable.SUBTASK_ID + " TEXT PRIMARY KEY, " +
+                    TaskSubtaskTable.TASK_ID + " TEXT NOT NULL, " +
+                    TaskSubtaskTable.WORKSPACE_ID + " TEXT NOT NULL, " +
+                    TaskSubtaskTable.CREATED_BY + " TEXT NOT NULL, " +
+                    TaskSubtaskTable.TITLE + " TEXT NOT NULL, " +
+                    TaskSubtaskTable.ESTIMATED_MINUTES +
+                    " INTEGER NOT NULL DEFAULT 0 CHECK (" +
+                    TaskSubtaskTable.ESTIMATED_MINUTES + " >= 0), " +
+                    TaskSubtaskTable.COMPLETED + " INTEGER NOT NULL DEFAULT 0, " +
+                    TaskSubtaskTable.SORT_ORDER + " INTEGER NOT NULL DEFAULT 0, " +
+                    TaskSubtaskTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    TaskSubtaskTable.UPDATED_AT + " INTEGER, " +
+                    "FOREIGN KEY (" + TaskSubtaskTable.TASK_ID + ") " +
+                    "REFERENCES " + TaskTable.TABLE_NAME +
+                    "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE, " +
+                    "FOREIGN KEY (" + TaskSubtaskTable.WORKSPACE_ID + ") " +
+                    "REFERENCES " + WorkspaceTable.TABLE_NAME +
+                    "(" + WorkspaceTable.WORKSPACE_ID + ") ON DELETE CASCADE, " +
+                    "FOREIGN KEY (" + TaskSubtaskTable.CREATED_BY + ") " +
                     "REFERENCES " + UserTable.TABLE_NAME +
                     "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
                     ")";
@@ -210,6 +235,7 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
         database.execSQL(CREATE_WORKSPACES_TABLE);
         database.execSQL(CREATE_PROJECTS_TABLE);
         database.execSQL(CREATE_TASKS_TABLE);
+        database.execSQL(CREATE_TASK_SUBTASKS_TABLE);
         database.execSQL(CREATE_WORK_SESSIONS_TABLE);
         database.execSQL(CREATE_WORKSPACE_MEMBERS_TABLE);
         database.execSQL(CREATE_TEAM_INVITES_TABLE);
@@ -262,6 +288,19 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                 "CREATE INDEX IF NOT EXISTS index_session_task " +
                         "ON " + WorkSessionTable.TABLE_NAME +
                         "(" + WorkSessionTable.TASK_ID + ")"
+        );
+
+        database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_subtask_task " +
+                        "ON " + TaskSubtaskTable.TABLE_NAME +
+                        "(" + TaskSubtaskTable.TASK_ID + ", " +
+                        TaskSubtaskTable.SORT_ORDER + ")"
+        );
+
+        database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_subtask_workspace " +
+                        "ON " + TaskSubtaskTable.TABLE_NAME +
+                        "(" + TaskSubtaskTable.WORKSPACE_ID + ")"
         );
 
         database.execSQL(
@@ -334,6 +373,10 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                             WorkspaceTable.TABLE_NAME + " WHERE " +
                             WorkspaceTable.TYPE + " = 'TEAM'"
             );
+            createIndexes(database);
+        }
+        if (oldVersion < 4) {
+            database.execSQL(CREATE_TASK_SUBTASKS_TABLE);
             createIndexes(database);
         }
     }

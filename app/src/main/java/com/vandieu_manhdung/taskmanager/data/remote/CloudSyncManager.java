@@ -12,15 +12,19 @@ import com.google.firebase.firestore.SetOptions;
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.constant.MembershipStatus;
 import com.vandieu_manhdung.taskmanager.core.constant.TeamRole;
+import com.vandieu_manhdung.taskmanager.core.notification.TaskReminderScheduler;
 import com.vandieu_manhdung.taskmanager.core.sync.SyncBus;
 import com.vandieu_manhdung.taskmanager.core.util.AppExecutors;
+import com.vandieu_manhdung.taskmanager.core.util.TaskSubtaskRules;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.TaskSubtaskDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TeamDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.UserDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.WorkSessionDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.WorkspaceDao;
 import com.vandieu_manhdung.taskmanager.model.Project;
 import com.vandieu_manhdung.taskmanager.model.Task;
+import com.vandieu_manhdung.taskmanager.model.TaskSubtask;
 import com.vandieu_manhdung.taskmanager.model.TeamTaskItem;
 import com.vandieu_manhdung.taskmanager.model.User;
 import com.vandieu_manhdung.taskmanager.model.WorkSession;
@@ -41,6 +45,7 @@ public final class CloudSyncManager {
     private static final String COLLECTION_MEMBERS = "workspace_members";
     private static final String COLLECTION_PROJECTS = "projects";
     private static final String COLLECTION_TASKS = "tasks";
+    private static final String COLLECTION_SUBTASKS = "task_subtasks";
     private static final String COLLECTION_SESSIONS = "work_sessions";
     private static final String PREFS = "cloud_sync_state";
 
@@ -51,8 +56,10 @@ public final class CloudSyncManager {
     private final WorkspaceDao workspaceDao;
     private final UserDao userDao;
     private final TaskDao taskDao;
+    private final TaskSubtaskDao subtaskDao;
     private final TeamDao teamDao;
     private final WorkSessionDao workSessionDao;
+    private final TaskReminderScheduler reminderScheduler;
     private final SharedPreferences preferences;
     private final List<ListenerRegistration> rootListeners = new ArrayList<>();
     private final Map<String, List<ListenerRegistration>> workspaceListeners =
@@ -60,6 +67,8 @@ public final class CloudSyncManager {
     private final Map<String, List<WorkSession>> pendingSessionsByTask =
             new ConcurrentHashMap<>();
     private final Map<String, PendingTask> pendingTasks = new ConcurrentHashMap<>();
+    private final Map<String, List<TaskSubtask>> pendingSubtasksByTask =
+            new ConcurrentHashMap<>();
 
     private FirebaseFirestore firestore;
     private String activeUserId;
@@ -70,8 +79,10 @@ public final class CloudSyncManager {
         workspaceDao = new WorkspaceDao(this.context);
         userDao = new UserDao(this.context);
         taskDao = new TaskDao(this.context);
+        subtaskDao = new TaskSubtaskDao(this.context);
         teamDao = new TeamDao(this.context);
         workSessionDao = new WorkSessionDao(this.context);
+        reminderScheduler = new TaskReminderScheduler(this.context);
         preferences = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
@@ -124,6 +135,7 @@ public final class CloudSyncManager {
         workspaceListeners.clear();
         pendingSessionsByTask.clear();
         pendingTasks.clear();
+        pendingSubtasksByTask.clear();
         activeUserId = null;
     }
 
@@ -245,6 +257,23 @@ public final class CloudSyncManager {
         }
     }
 
+    public void upsertSubtask(TaskSubtask subtask) {
+        if (!ready() || subtask == null) return;
+        firestore.collection(COLLECTION_SUBTASKS)
+                .document(subtask.getSubtaskId())
+                .set(subtaskMap(subtask), SetOptions.merge())
+                .addOnFailureListener(this::logSyncFailure);
+    }
+
+    public void deleteSubtask(String subtaskId) {
+        if (ready()) {
+            firestore.collection(COLLECTION_SUBTASKS)
+                    .document(subtaskId)
+                    .delete()
+                    .addOnFailureListener(this::logSyncFailure);
+        }
+    }
+
     public void upsertWorkSession(WorkSession session, String workspaceId) {
         if (!ready() || session == null) return;
         Map<String, Object> values = new HashMap<>();
@@ -310,6 +339,9 @@ public final class CloudSyncManager {
             upsertWorkspace(personal, userId, TeamRole.OWNER);
             for (Task task : taskDao.findAllPersonalTasks(personal.getWorkspaceId())) {
                 upsertTask(task, userId);
+            }
+            for (TaskSubtask subtask : subtaskDao.findAllByWorkspace(personal.getWorkspaceId())) {
+                upsertSubtask(subtask);
             }
             for (WorkSession session : workSessionDao.findAllByUser(userId)) {
                 upsertWorkSession(session, personal.getWorkspaceId());
@@ -462,10 +494,36 @@ public final class CloudSyncManager {
                         executors.database().execute(() -> {
                             if (change.getType() == DocumentChange.Type.REMOVED) {
                                 taskDao.delete(task.getTaskId());
+                                reminderScheduler.cancel(task.getTaskId());
                                 pendingTasks.remove(task.getTaskId());
                             } else {
                                 persistRemoteTask(task, assigneeId);
                             }
+                            notifyLocalChange();
+                        });
+                    }
+                }));
+        listeners.add(firestore.collection(COLLECTION_SUBTASKS)
+                .whereEqualTo("workspaceId", workspaceId)
+                .addSnapshotListener((snapshot, error) -> {
+                    if (error != null || snapshot == null) return;
+                    for (DocumentChange change : snapshot.getDocumentChanges()) {
+                        TaskSubtask subtask = subtaskFrom(change.getDocument());
+                        executors.database().execute(() -> {
+                            if (change.getType() == DocumentChange.Type.REMOVED) {
+                                subtaskDao.delete(subtask.getSubtaskId());
+                                List<TaskSubtask> pending = pendingSubtasksByTask.get(subtask.getTaskId());
+                                if (pending != null) {
+                                    pending.removeIf(item -> subtask.getSubtaskId().equals(item.getSubtaskId()));
+                                }
+                            } else if (taskDao.findById(subtask.getTaskId()) == null) {
+                                pendingSubtasksByTask
+                                        .computeIfAbsent(subtask.getTaskId(), ignored -> new ArrayList<>())
+                                        .add(subtask);
+                            } else {
+                                subtaskDao.save(subtask);
+                            }
+                            recalculateLocalParent(subtask.getTaskId());
                             notifyLocalChange();
                         });
                     }
@@ -523,7 +581,11 @@ public final class CloudSyncManager {
             return;
         }
         taskDao.save(task);
+        if (task.getProjectId() == null || task.getProjectId().isBlank()) {
+            reminderScheduler.schedule(task);
+        }
         pendingTasks.remove(task.getTaskId());
+        persistPendingSubtasks(task.getTaskId());
         persistPendingSessions(task.getTaskId());
         teamDao.clearTaskAssignees(task.getTaskId());
         if (assigneeId != null && !assigneeId.isBlank()) {
@@ -533,6 +595,27 @@ public final class CloudSyncManager {
                     task.getCreatedBy(),
                     task.getUpdatedAt()
             );
+        }
+    }
+
+    private void persistPendingSubtasks(String taskId) {
+        List<TaskSubtask> pending = pendingSubtasksByTask.remove(taskId);
+        if (pending == null) return;
+        for (TaskSubtask subtask : pending) {
+            subtaskDao.save(subtask);
+        }
+        recalculateLocalParent(taskId);
+    }
+
+    private void recalculateLocalParent(String taskId) {
+        Task task = taskDao.findById(taskId);
+        if (task == null) return;
+        List<TaskSubtask> subtasks = subtaskDao.findAllByTask(taskId);
+        if (subtasks.isEmpty()) return;
+        TaskSubtaskRules.applyToTask(task, subtasks);
+        taskDao.updateStatusAndProgress(taskId, task.getStatus(), task.getProgress());
+        if (task.getProjectId() == null || task.getProjectId().isBlank()) {
+            reminderScheduler.schedule(task);
         }
     }
 
@@ -625,6 +708,21 @@ public final class CloudSyncManager {
         return values;
     }
 
+    private Map<String, Object> subtaskMap(TaskSubtask subtask) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("subtaskId", subtask.getSubtaskId());
+        values.put("taskId", subtask.getTaskId());
+        values.put("workspaceId", subtask.getWorkspaceId());
+        values.put("createdBy", subtask.getCreatedBy());
+        values.put("title", subtask.getTitle());
+        values.put("estimatedMinutes", subtask.getEstimatedMinutes());
+        values.put("completed", subtask.isCompleted());
+        values.put("sortOrder", subtask.getSortOrder());
+        values.put("createdAt", subtask.getCreatedAt());
+        values.put("updatedAt", subtask.getUpdatedAt());
+        return values;
+    }
+
     private Workspace workspaceFrom(DocumentSnapshot document) {
         Workspace workspace = new Workspace();
         workspace.setWorkspaceId(string(document, "workspaceId", document.getId()));
@@ -681,6 +779,22 @@ public final class CloudSyncManager {
         task.setCreatedAt(number(document, "createdAt"));
         task.setUpdatedAt(number(document, "updatedAt"));
         return task;
+    }
+
+    private TaskSubtask subtaskFrom(DocumentSnapshot document) {
+        TaskSubtask subtask = new TaskSubtask();
+        subtask.setSubtaskId(string(document, "subtaskId", document.getId()));
+        subtask.setTaskId(string(document, "taskId", ""));
+        subtask.setWorkspaceId(string(document, "workspaceId", ""));
+        subtask.setCreatedBy(string(document, "createdBy", ""));
+        subtask.setTitle(string(document, "title", ""));
+        subtask.setEstimatedMinutes(integer(document, "estimatedMinutes"));
+        Boolean completed = document.getBoolean("completed");
+        subtask.setCompleted(Boolean.TRUE.equals(completed));
+        subtask.setSortOrder(integer(document, "sortOrder"));
+        subtask.setCreatedAt(number(document, "createdAt"));
+        subtask.setUpdatedAt(number(document, "updatedAt"));
+        return subtask;
     }
 
     private WorkSession sessionFrom(DocumentSnapshot document) {

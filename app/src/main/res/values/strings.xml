@@ -5,6 +5,7 @@
     <string name="edit_task">Sửa công việc</string>
     <string name="delete_task">Xóa công việc</string>
     <string name="save_task">Lưu công việc</string>
+    <string name="save_task_and_add_steps">Lưu và thêm các bước</string>
     <string name="save_changes">Lưu thay đổi</string>
     <string name="refresh">Làm mới</string>
     <string name="statistics">Thống kê</string>
@@ -19,6 +20,15 @@
     <string name="task_title_hint">Tên công việc</string>
     <string name="task_description_hint">Mô tả công việc</string>
     <string name="estimated_minutes_hint">Thời gian dự kiến (phút)</string>
+    <string name="task_schedule_label">Lịch thực hiện và nhắc việc</string>
+    <string name="select_start_datetime">Chọn ngày và giờ bắt đầu</string>
+    <string name="select_due_datetime">Chọn ngày và giờ kết thúc</string>
+    <string name="no_start_datetime_selected">Chưa chọn thời gian bắt đầu</string>
+    <string name="selected_start_datetime">Bắt đầu: %1$s</string>
+    <string name="selected_due_datetime">Kết thúc: %1$s</string>
+    <string name="calculated_duration_empty">Thời lượng dự kiến sẽ được tự động tính</string>
+    <string name="calculated_duration">Thời lượng dự kiến: %1$s</string>
+    <string name="invalid_task_schedule">Thời gian kết thúc phải sau thời gian bắt đầu</string>
     <string name="status_label">Trạng thái</string>
     <string name="priority_label">Độ ưu tiên</string>
     <string name="progress_initial">Tiến độ: 0%</string>
@@ -51,25 +61,40 @@
     <string name="task_detail_status">Trạng thái: %1$s</string>
     <string name="task_detail_priority">Độ ưu tiên: %1$s</string>
     <string name="task_detail_progress">Tiến độ: %1$d%%</string>
-    <string name="task_detail_start_date">Ngày bắt đầu: %1$s</string>
-    <string name="task_detail_due_date">Hạn hoàn thành: %1$s</string>
+    <string name="task_detail_start_date">Bắt đầu: %1$s</string>
+    <string name="task_detail_due_date">Kết thúc: %1$s</string>
     <string name="task_detail_overdue">Đã quá hạn từ: %1$s</string>
-    <string name="task_detail_estimated">Thời gian dự kiến: %1$d phút</string>
+    <string name="task_detail_estimated">Thời lượng dự kiến: %1$s</string>
     <string name="task_detail_updated_at">Cập nhật lần cuối: %1$s</string>
+    <string name="task_detail_subtasks_summary">Các bước thực hiện: %1$d/%2$d hoàn thành</string>
+    <string name="task_detail_manual_progress">Tiến độ thủ công: %1$d%%</string>
+    <string name="task_detail_auto_progress">Tiến độ tự động: %1$d%%</string>
+    <string name="task_detail_actual_time">Thời gian thực tế: %1$d phút</string>
+    <string name="task_subtasks_title">Chi tiết các bước cần thực hiện</string>
+    <string name="add_subtask">Thêm bước</string>
+    <string name="subtask_title_hint">Tên bước thực hiện</string>
+    <string name="subtask_estimated_hint">Thời gian dự kiến (phút, tùy chọn)</string>
+    <string name="subtask_estimated">Dự kiến: %1$d phút</string>
+    <string name="subtask_add_title">Thêm bước thực hiện</string>
+    <string name="subtask_delete_title">Xóa bước thực hiện?</string>
+    <string name="subtask_delete_message">Bước này sẽ bị xóa khỏi công việc.</string>
+    <string name="subtask_empty">Chưa có bước nào. Hãy chia công việc thành các bước nhỏ.</string>
+    <string name="subtask_saved">Đã thêm bước thực hiện</string>
+    <string name="subtask_deleted">Đã xóa bước thực hiện</string>
+
+    <string name="notification_channel_tasks">Nhắc lịch công việc</string>
+    <string name="notification_channel_tasks_description">Thông báo giờ bắt đầu, sắp hết hạn và tiến độ checklist</string>
+    <string name="notification_task_start_title">Đã đến giờ thực hiện</string>
+    <string name="notification_task_start_message">Công việc “%1$s” bắt đầu ngay bây giờ.</string>
+    <string name="notification_task_due_soon_title">Công việc sắp hết hạn</string>
+    <string name="notification_task_due_soon_message">Công việc “%1$s” còn 1 giờ để hoàn thành.</string>
+    <string name="notification_subtask_completed_title">Đã cập nhật: %1$s</string>
+    <string name="notification_subtask_completed_message">Hoàn thành bước “%1$s”. Tiến độ checklist: %2$d/%3$d.</string>
 
     <string name="personal_dashboard">Thống kê công việc cá nhân</string>
     <string name="dashboard_total_label">Tổng công việc</string>
     <string name="overdue_tasks">Công việc quá hạn</string>
     <string name="completion_rate_value">Tỷ lệ hoàn thành: %1$d%%</string>
-
-    <string name="work_timer">Bấm giờ làm việc</string>
-    <string name="start_timer">Bắt đầu</string>
-    <string name="stop_timer">Dừng và lưu</string>
-    <string name="timer_running">Đang bấm giờ</string>
-    <string name="timer_stopped">Chưa bấm giờ</string>
-    <string name="timer_initial">00:00:00</string>
-    <string name="timer_total_initial">Tổng thời gian đã lưu: 0 phút</string>
-    <string name="timer_total_minutes">Tổng thời gian đã lưu: %1$d phút</string>
 
     <string name="team_workspaces">Không gian làm việc nhóm</string>
     <string name="home">Trang chủ</string>
