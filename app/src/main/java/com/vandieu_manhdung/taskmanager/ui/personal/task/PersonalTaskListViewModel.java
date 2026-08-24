@@ -11,7 +11,7 @@ import androidx.lifecycle.Observer;
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskSortOption;
 import com.vandieu_manhdung.taskmanager.core.sync.SyncBus;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.TaskRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.TaskRepository;
 import com.vandieu_manhdung.taskmanager.model.Task;
 
 import java.util.ArrayList;

@@ -107,16 +107,18 @@
 
             </LinearLayout>
 
-            <RelativeLayout
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
+                android:layout_marginTop="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
                     android:id="@+id/textTaskSubtaskSummary"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
+                    android:layout_weight="1"
                     android:textColor="@color/task_text_secondary"
                     android:textSize="12sp"
                     tools:text="2/5 bước hoàn thành" />
@@ -125,13 +127,13 @@
                     android:id="@+id/textTaskProgress"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
+                    android:gravity="end"
                     android:textColor="@color/task_navy"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     tools:text="40%" />
 
-            </RelativeLayout>
+            </LinearLayout>
 
             <ProgressBar
                 android:id="@+id/progressTask"

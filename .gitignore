@@ -12,4 +12,9 @@
 /captures
 .externalNativeBuild
 .cxx
+functions/node_modules/
+firebase-tests/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
 local.properties

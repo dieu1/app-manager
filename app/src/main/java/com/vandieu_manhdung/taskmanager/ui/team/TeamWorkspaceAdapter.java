@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.model.Workspace;
 
+import java.util.Locale;
 import java.util.Objects;
 
 public class TeamWorkspaceAdapter extends
@@ -68,15 +69,20 @@ public class TeamWorkspaceAdapter extends
     class WorkspaceViewHolder extends RecyclerView.ViewHolder {
         private final TextView name;
         private final TextView description;
+        private final TextView initial;
 
         WorkspaceViewHolder(@NonNull View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.textTeamName);
             description = itemView.findViewById(R.id.textTeamDescription);
+            initial = itemView.findViewById(R.id.textTeamInitial);
         }
 
         void bind(Workspace workspace) {
             name.setText(workspace.getName());
+            String teamName = workspace.getName();
+            initial.setText(teamName == null || teamName.isBlank()
+                    ? "T" : teamName.substring(0, 1).toUpperCase(Locale.getDefault()));
             String value = workspace.getDescription();
             description.setText(value == null || value.isBlank()
                     ? itemView.getContext().getString(R.string.no_team_description)

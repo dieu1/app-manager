@@ -1,5 +1,7 @@
 package com.vandieu_manhdung.taskmanager.ui.team.workspace;
 
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,15 +27,23 @@ import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
 import com.vandieu_manhdung.taskmanager.core.constant.TeamRole;
 import com.vandieu_manhdung.taskmanager.core.util.TeamRules;
 import com.vandieu_manhdung.taskmanager.model.Project;
+import com.vandieu_manhdung.taskmanager.model.ProjectMilestone;
 import com.vandieu_manhdung.taskmanager.model.TeamTaskItem;
 import com.vandieu_manhdung.taskmanager.model.TeamWorkspaceSnapshot;
 import com.vandieu_manhdung.taskmanager.model.WorkspaceMember;
+import com.vandieu_manhdung.taskmanager.ui.main.MainActivity;
 import com.vandieu_manhdung.taskmanager.ui.team.task.TeamTaskFormFragment;
 import com.vandieu_manhdung.taskmanager.ui.team.dashboard.TeamDashboardFragment;
+import com.vandieu_manhdung.taskmanager.ui.personal.task.detail.TaskDetailFragment;
 
 import java.util.ArrayList;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class TeamWorkspaceFragment extends Fragment {
 
@@ -54,6 +64,7 @@ public class TeamWorkspaceFragment extends Fragment {
     private Spinner assigneeFilterSpinner;
     private Spinner statusFilterSpinner;
     private boolean updatingFilters;
+    private Project milestoneProject;
     private String selectedProjectId;
     private String selectedAssigneeId;
     private String selectedStatus;
@@ -94,6 +105,8 @@ public class TeamWorkspaceFragment extends Fragment {
 
         view.findViewById(R.id.buttonBackTeams).setOnClickListener(
                 button -> getParentFragmentManager().popBackStack());
+        view.findViewById(R.id.buttonWorkspaceNotifications).setOnClickListener(
+                button -> ((MainActivity) requireActivity()).openNotifications());
         view.findViewById(R.id.buttonEditTeam).setOnClickListener(
                 button -> showEditTeamDialog());
         view.findViewById(R.id.buttonDeleteTeam).setOnClickListener(
@@ -106,6 +119,10 @@ public class TeamWorkspaceFragment extends Fragment {
                 button -> openTaskForm(null));
         view.findViewById(R.id.buttonTeamDashboard).setOnClickListener(
                 button -> openDashboard());
+        view.findViewById(R.id.buttonLeaveTeam).setOnClickListener(
+                button -> confirmLeaveTeam());
+        view.findViewById(R.id.buttonLoadMoreTeamTasks).setOnClickListener(
+                button -> viewModel.loadMoreTasks());
 
         viewModel.initialize(workspaceId, userId);
     }
@@ -123,7 +140,7 @@ public class TeamWorkspaceFragment extends Fragment {
         RecyclerView projectList = view.findViewById(R.id.recyclerTeamProjects);
         RecyclerView taskList = view.findViewById(R.id.recyclerTeamTasks);
         memberAdapter = new TeamMemberAdapter(this::showMemberActions);
-        projectAdapter = new TeamProjectAdapter();
+        projectAdapter = new TeamProjectAdapter(this::showProjectActions);
         taskAdapter = new TeamTaskAdapter(this::openTask);
         memberList.setLayoutManager(new LinearLayoutManager(requireContext()));
         projectList.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -205,6 +222,9 @@ public class TeamWorkspaceFragment extends Fragment {
                 getParentFragmentManager().popBackStack();
             }
         });
+        viewModel.getMilestones().observe(getViewLifecycleOwner(), values -> {
+            if (milestoneProject != null && values != null) displayMilestones(values);
+        });
     }
 
     private void display(View root, TeamWorkspaceSnapshot snapshot) {
@@ -229,6 +249,8 @@ public class TeamWorkspaceFragment extends Fragment {
         taskAdapter.submitList(snapshot.getTasks());
         noProjects.setVisibility(projects.isEmpty() ? View.VISIBLE : View.GONE);
         noTasks.setVisibility(snapshot.getTasks().isEmpty() ? View.VISIBLE : View.GONE);
+        root.findViewById(R.id.buttonLoadMoreTeamTasks).setVisibility(
+                snapshot.hasMoreTasks() ? View.VISIBLE : View.GONE);
 
         boolean owner = TeamRules.canManageWorkspace(snapshot.getCurrentRole());
         boolean manager = TeamRules.canManageMembers(snapshot.getCurrentRole());
@@ -236,6 +258,7 @@ public class TeamWorkspaceFragment extends Fragment {
         root.findViewById(R.id.buttonDeleteTeam).setVisibility(owner ? View.VISIBLE : View.GONE);
         root.findViewById(R.id.buttonAddMember).setVisibility(manager ? View.VISIBLE : View.GONE);
         root.findViewById(R.id.buttonAddProject).setVisibility(manager ? View.VISIBLE : View.GONE);
+        root.findViewById(R.id.buttonLeaveTeam).setVisibility(owner ? View.GONE : View.VISIBLE);
         setupFilterOptions();
     }
 
@@ -366,9 +389,12 @@ public class TeamWorkspaceFragment extends Fragment {
                     : getString(R.string.set_as_admin);
             new AlertDialog.Builder(requireContext())
                     .setTitle(member.getDisplayName())
-                    .setItems(new String[]{roleAction, getString(R.string.remove_member)},
+                    .setItems(new String[]{getString(R.string.transfer_ownership),
+                                    roleAction, getString(R.string.remove_member)},
                             (dialog, which) -> {
                                 if (which == 0) {
+                                    confirmTransferOwnership(member);
+                                } else if (which == 1) {
                                     viewModel.changeMemberRole(
                                             member.getUserId(),
                                             TeamRole.ADMIN.equals(member.getRole())
@@ -394,16 +420,134 @@ public class TeamWorkspaceFragment extends Fragment {
                 .show();
     }
 
+    private void confirmTransferOwnership(WorkspaceMember member) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.transfer_ownership)
+                .setMessage(getString(R.string.transfer_ownership_question,
+                        member.getDisplayName()))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.confirm, (dialog, which) ->
+                        viewModel.transferOwnership(member.getUserId()))
+                .show();
+    }
+
+    private void confirmLeaveTeam() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.leave_team)
+                .setMessage(R.string.leave_team_question)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.leave_team,
+                        (dialog, which) -> viewModel.leaveTeam())
+                .show();
+    }
+
     private void showAddProjectDialog() {
+        showProjectDialog(null);
+    }
+
+    private void showProjectActions(Project project) {
+        if (currentSnapshot == null ||
+                !TeamRules.canManageProjects(currentSnapshot.getCurrentRole())) return;
+        new AlertDialog.Builder(requireContext())
+                .setTitle(project.getName())
+                .setItems(new String[]{getString(R.string.edit_project),
+                                getString(R.string.project_milestones),
+                                getString(R.string.complete_project),
+                                getString(R.string.archive_project)},
+                        (dialog, which) -> {
+                            if (which == 0) showProjectDialog(project);
+                            else if (which == 1) showMilestones(project);
+                            else if (which == 2) viewModel.completeProject(project);
+                            else confirmArchiveProject(project);
+                        })
+                .show();
+    }
+
+    private void showMilestones(Project project) {
+        milestoneProject = project;
+        viewModel.loadMilestones(project);
+    }
+
+    private void displayMilestones(List<ProjectMilestone> values) {
+        String[] labels = new String[values.size() + 1];
+        labels[0] = getString(R.string.add_milestone);
+        for (int index = 0; index < values.size(); index++) {
+            ProjectMilestone item = values.get(index);
+            labels[index + 1] = (item.isCompleted() ? "✓ " : "○ ") + item.getTitle() +
+                    " · " + formatDateTime(item.getDueDate());
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.project_milestones_for, milestoneProject.getName()))
+                .setItems(labels, (dialog, which) -> {
+                    if (which == 0) showAddMilestoneDialog(milestoneProject);
+                    else {
+                        ProjectMilestone item = values.get(which - 1);
+                        viewModel.toggleMilestone(milestoneProject, item, !item.isCompleted());
+                    }
+                })
+                .setNegativeButton(R.string.close, null)
+                .show();
+    }
+
+    private void showAddMilestoneDialog(Project project) {
+        android.widget.LinearLayout form = new android.widget.LinearLayout(requireContext());
+        form.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        form.setPadding(padding, 0, padding, 0);
+        EditText input = new EditText(requireContext());
+        input.setHint(R.string.milestone_title);
+        TextView due = new TextView(requireContext());
+        due.setPadding(0, padding, 0, padding);
+        due.setText(R.string.select_milestone_due);
+        long[] dueDate = new long[]{project.getDueDate()};
+        due.setOnClickListener(view -> selectDateTime(dueDate[0], value -> {
+            dueDate[0] = value;
+            due.setText(formatDateTime(value));
+        }));
+        form.addView(input);
+        form.addView(due);
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.add_milestone)
+                .setView(form)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.add, (dialog, which) ->
+                        viewModel.addMilestone(project, input.getText().toString(), dueDate[0]))
+                .show();
+    }
+
+    private void showProjectDialog(Project existing) {
         View content = LayoutInflater.from(requireContext())
                 .inflate(R.layout.dialog_project_form, null, false);
         EditText name = content.findViewById(R.id.editProjectName);
         EditText description = content.findViewById(R.id.editProjectDescription);
+        Spinner manager = content.findViewById(R.id.spinnerProjectManager);
+        TextView startText = content.findViewById(R.id.textProjectStart);
+        TextView dueText = content.findViewById(R.id.textProjectDue);
+        List<String> memberNames = new ArrayList<>();
+        for (WorkspaceMember member : members) memberNames.add(member.getDisplayName());
+        setSpinner(manager, memberNames);
+        long[] dates = new long[]{existing == null ? 0 : existing.getStartDate(),
+                existing == null ? 0 : existing.getDueDate()};
+        if (existing != null) {
+            name.setText(existing.getName());
+            description.setText(existing.getDescription());
+            manager.setSelection(findMemberPosition(existing.getManagerId()) - 1 < 0
+                    ? 0 : findMemberPosition(existing.getManagerId()) - 1);
+        }
+        Consumer<Void> renderDates = ignored -> {
+            startText.setText(formatDateTime(dates[0]));
+            dueText.setText(formatDateTime(dates[1]));
+        };
+        renderDates.accept(null);
+        content.findViewById(R.id.buttonProjectStart).setOnClickListener(button ->
+                selectDateTime(dates[0], value -> { dates[0] = value; renderDates.accept(null); }));
+        content.findViewById(R.id.buttonProjectDue).setOnClickListener(button ->
+                selectDateTime(dates[1], value -> { dates[1] = value; renderDates.accept(null); }));
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setTitle(R.string.add_project)
+                .setTitle(existing == null ? R.string.add_project : R.string.edit_project)
                 .setView(content)
                 .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.create, null)
+                .setPositiveButton(existing == null ? R.string.create : R.string.save_changes, null)
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(button -> {
@@ -411,15 +555,55 @@ public class TeamWorkspaceFragment extends Fragment {
                         name.setError(getString(R.string.project_name_required));
                         return;
                     }
-                    viewModel.createProject(name.getText().toString(),
-                            description.getText().toString());
+                    if (dates[0] > 0 && dates[1] > 0 && dates[1] <= dates[0]) {
+                        Toast.makeText(requireContext(), R.string.project_due_after_start,
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    viewModel.saveProject(existing, name.getText().toString(),
+                            description.getText().toString(), dates[0], dates[1],
+                            members.get(manager.getSelectedItemPosition()).getUserId());
                     dialog.dismiss();
                 }));
         dialog.show();
     }
 
+    private void confirmArchiveProject(Project project) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.archive_project)
+                .setMessage(R.string.archive_project_question)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.archive_project,
+                        (dialog, which) -> viewModel.archiveProject(project))
+                .show();
+    }
+
+    private void selectDateTime(long initial, Consumer<Long> callback) {
+        Calendar calendar = Calendar.getInstance();
+        if (initial > 0) calendar.setTimeInMillis(initial);
+        new DatePickerDialog(requireContext(), (picker, year, month, day) ->
+                new TimePickerDialog(requireContext(), (time, hour, minute) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(year, month, day, hour, minute, 0);
+                    selected.set(Calendar.MILLISECOND, 0);
+                    callback.accept(selected.getTimeInMillis());
+                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show(),
+                calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private String formatDateTime(long value) {
+        if (value <= 0) return getString(R.string.not_set);
+        return new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                .format(new Date(value));
+    }
+
     private void openTask(TeamTaskItem item) {
-        openTaskForm(item.getTask().getTaskId());
+        getParentFragmentManager().beginTransaction()
+                .replace(R.id.main, TaskDetailFragment.newTeamInstance(
+                        workspaceId, userId, item.getTask().getTaskId()))
+                .addToBackStack("team_task_detail")
+                .commit();
     }
 
     private void openTaskForm(String taskId) {

@@ -22,4 +22,17 @@ public class TaskScheduleRulesTest {
         long due = TimeUnit.HOURS.toMillis(10);
         assertEquals(TimeUnit.HOURS.toMillis(9), TaskScheduleRules.dueSoonAt(due));
     }
+
+    @Test
+    public void nextDueSoonAt_schedulesImmediatelyWhenLessThanOneHourRemains() {
+        long now = TimeUnit.HOURS.toMillis(10);
+        long due = now + TimeUnit.MINUTES.toMillis(20);
+        assertEquals(now + 1_000L, TaskScheduleRules.nextDueSoonAt(due, now));
+    }
+
+    @Test
+    public void nextDueSoonAt_ignoresExpiredTask() {
+        long now = TimeUnit.HOURS.toMillis(10);
+        assertEquals(0, TaskScheduleRules.nextDueSoonAt(now, now));
+    }
 }

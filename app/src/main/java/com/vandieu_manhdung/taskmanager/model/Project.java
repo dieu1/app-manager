@@ -8,6 +8,13 @@ public class Project {
     private String description;
     private String status;
     private String createdBy;
+    private String managerId;
+    private long startDate;
+    private long dueDate;
+    private long completedAt;
+    private long deletedAt;
+    private int version;
+    private String syncStatus;
     private long createdAt;
     private long updatedAt;
 
@@ -58,6 +65,21 @@ public class Project {
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
     }
+
+    public String getManagerId() { return managerId; }
+    public void setManagerId(String managerId) { this.managerId = managerId; }
+    public long getStartDate() { return startDate; }
+    public void setStartDate(long startDate) { this.startDate = startDate; }
+    public long getDueDate() { return dueDate; }
+    public void setDueDate(long dueDate) { this.dueDate = dueDate; }
+    public long getCompletedAt() { return completedAt; }
+    public void setCompletedAt(long completedAt) { this.completedAt = completedAt; }
+    public long getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(long deletedAt) { this.deletedAt = deletedAt; }
+    public int getVersion() { return version; }
+    public void setVersion(int version) { this.version = version; }
+    public String getSyncStatus() { return syncStatus; }
+    public void setSyncStatus(String syncStatus) { this.syncStatus = syncStatus; }
 
     public long getCreatedAt() {
         return createdAt;

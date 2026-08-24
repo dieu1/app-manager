@@ -1,4 +1,4 @@
-package com.vandieu_manhdung.taskmanager.data.reponsitory;
+package com.vandieu_manhdung.taskmanager.data.repository;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;

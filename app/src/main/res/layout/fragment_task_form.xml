@@ -62,6 +62,7 @@
                 <ImageView
                     android:layout_width="20dp"
                     android:layout_height="20dp"
+                    android:contentDescription="@null"
                     android:src="@drawable/ic_edit_pencil" />
 
                 <EditText
@@ -95,6 +96,7 @@
 
             <!-- Status and Priority Dropdowns -->
             <LinearLayout
+                android:baselineAligned="false"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
@@ -163,6 +165,7 @@
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
+                        android:contentDescription="@null"
                         android:src="@drawable/ic_calendar" />
 
                     <TextView

@@ -1,11 +1,17 @@
 package com.vandieu_manhdung.taskmanager.ui.main;
 
 import android.Manifest;
+import android.app.AlarmManager;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -19,34 +25,45 @@ import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.notification.TaskNotificationManager;
 import com.vandieu_manhdung.taskmanager.core.notification.TaskReminderScheduler;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.AuthRepository;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.WorkspaceRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.AuthRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.WorkspaceRepository;
 import com.vandieu_manhdung.taskmanager.data.remote.CloudSyncManager;
 import com.vandieu_manhdung.taskmanager.model.User;
 import com.vandieu_manhdung.taskmanager.model.Workspace;
 import com.vandieu_manhdung.taskmanager.ui.personal.task.PersonalTaskListFragment;
+import com.vandieu_manhdung.taskmanager.ui.personal.task.detail.TaskDetailFragment;
+import com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao;
+import com.vandieu_manhdung.taskmanager.model.Task;
 import com.vandieu_manhdung.taskmanager.ui.auth.AuthFragment;
 import com.vandieu_manhdung.taskmanager.ui.auth.BackendSetupFragment;
 import com.vandieu_manhdung.taskmanager.ui.auth.ForgotPasswordFragment;
 import com.vandieu_manhdung.taskmanager.ui.auth.RegisterFragment;
 import com.vandieu_manhdung.taskmanager.ui.home.HomeFragment;
 import com.vandieu_manhdung.taskmanager.ui.profile.ProfileFragment;
+import com.vandieu_manhdung.taskmanager.ui.notification.NotificationFragment;
+import com.vandieu_manhdung.taskmanager.ui.personal.trash.TaskTrashFragment;
 import com.vandieu_manhdung.taskmanager.ui.team.TeamListFragment;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_NOTIFICATIONS = 2001;
+    public static final String EXTRA_OPEN_TASK_ID = "open_task_id";
 
     private AuthRepository authRepository;
     private User currentUser;
     private Workspace personalWorkspace;
+    private boolean exactAlarmPromptShown;
+    private boolean hadExactAlarmAccess;
+    private String pendingTaskId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
+        pendingTaskId = getIntent().getStringExtra(EXTRA_OPEN_TASK_ID);
         TaskNotificationManager.createChannel(this);
+        hadExactAlarmAccess = canScheduleExactAlarms();
         authRepository = new AuthRepository(this);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -81,11 +98,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onAuthenticated(User user) {
-        requestNotificationPermissionIfNeeded();
+        if (!requestNotificationPermissionIfNeeded()) {
+            requestExactAlarmAccessIfNeeded();
+        }
         initializeApplication(user);
     }
 
-    private void requestNotificationPermissionIfNeeded() {
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        pendingTaskId = intent.getStringExtra(EXTRA_OPEN_TASK_ID);
+        if (currentUser != null && personalWorkspace != null) {
+            openPendingTaskOrHome();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        boolean hasExactAlarmAccess = canScheduleExactAlarms();
+        if (hasExactAlarmAccess && !hadExactAlarmAccess) {
+            new Thread(() -> new TaskReminderScheduler(this).rescheduleAll()).start();
+        }
+        hadExactAlarmAccess = hasExactAlarmAccess;
+    }
+
+    private boolean requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
@@ -94,6 +133,56 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{Manifest.permission.POST_NOTIFICATIONS},
                     REQUEST_NOTIFICATIONS
             );
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NOTIFICATIONS) {
+            requestExactAlarmAccessIfNeeded();
+        }
+    }
+
+    private boolean canScheduleExactAlarms() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return true;
+        }
+        AlarmManager manager = (AlarmManager) getSystemService(ALARM_SERVICE);
+        return manager != null && manager.canScheduleExactAlarms();
+    }
+
+    private void requestExactAlarmAccessIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                canScheduleExactAlarms() || exactAlarmPromptShown) {
+            return;
+        }
+        exactAlarmPromptShown = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.exact_alarm_permission_title)
+                .setMessage(R.string.exact_alarm_permission_message)
+                .setPositiveButton(
+                        R.string.open_settings,
+                        (dialog, which) -> openExactAlarmSettings()
+                )
+                .setNegativeButton(R.string.later, null)
+                .show();
+    }
+
+    private void openExactAlarmSettings() {
+        Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                .setData(Uri.parse("package:" + getPackageName()));
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException exception) {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + getPackageName())));
         }
     }
 
@@ -145,11 +234,52 @@ public class MainActivity extends AppCompatActivity {
     public void openProfile() {
         if (currentUser == null) return;
         navigate(ProfileFragment.newInstance(
+                currentUser.getUserId(),
                 currentUser.getDisplayName(),
                 currentUser.getEmail(),
-                currentUser.getUserCode()
+                currentUser.getUserCode(),
+                currentUser.getAvatarUrl()
             )
         );
+    }
+
+    public void openNotifications() {
+        if (currentUser == null) return;
+        navigate(NotificationFragment.newInstance(currentUser.getUserId()));
+    }
+
+    public void openTaskTrash() {
+        if (personalWorkspace == null) return;
+        navigate(TaskTrashFragment.newInstance(personalWorkspace.getWorkspaceId()));
+    }
+
+    public void openTaskDetail(String taskId) {
+        if (currentUser == null || personalWorkspace == null || taskId == null) return;
+        navigate(taskDetailFragment(taskId));
+    }
+
+    public void onProfileUpdated(User user) {
+        currentUser = user;
+    }
+
+    private void openPendingTaskOrHome() {
+        if (pendingTaskId == null || pendingTaskId.isBlank()) {
+            openHome();
+            return;
+        }
+        String taskId = pendingTaskId;
+        pendingTaskId = null;
+        showRootFragment(taskDetailFragment(taskId));
+    }
+
+    private TaskDetailFragment taskDetailFragment(String taskId) {
+        Task task = new TaskDao(this).findByIdIncludingDeleted(taskId);
+        if (task != null && task.getProjectId() != null && !task.getProjectId().isBlank()) {
+            return TaskDetailFragment.newTeamInstance(
+                    task.getWorkspaceId(), currentUser.getUserId(), taskId);
+        }
+        return TaskDetailFragment.newInstance(
+                personalWorkspace.getWorkspaceId(), currentUser.getUserId(), taskId);
     }
 
     private void showRootFragment(androidx.fragment.app.Fragment fragment) {
@@ -188,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
                         new RepositoryCallback<Boolean>() {
                             @Override
                             public void onSuccess(Boolean ignored) {
-                                openHome();
+                                openPendingTaskOrHome();
                             }
 
                             @Override
@@ -199,7 +329,7 @@ public class MainActivity extends AppCompatActivity {
                                         "Không thể đồng bộ dữ liệu: " + exception.getMessage(),
                                         Toast.LENGTH_LONG
                                 ).show();
-                                openHome();
+                                openPendingTaskOrHome();
                             }
                         }
                 ));

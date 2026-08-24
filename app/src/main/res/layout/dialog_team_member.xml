@@ -5,10 +5,18 @@
     android:orientation="vertical"
     android:padding="20dp">
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/team_ui_invite_hint"
+        android:textAppearance="@style/TextAppearance.TaskManager.Team.Body" />
+
     <EditText
         android:id="@+id/editMemberCode"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="54dp"
+        android:background="@drawable/bg_team_input"
         android:hint="@string/member_code"
         android:importantForAutofill="no"
         android:inputType="textCapCharacters"
@@ -17,6 +25,7 @@
     <Spinner
         android:id="@+id/spinnerMemberRole"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp" />
+        android:layout_height="54dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_team_input" />
 </LinearLayout>

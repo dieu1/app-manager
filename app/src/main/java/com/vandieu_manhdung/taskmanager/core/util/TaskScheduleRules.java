@@ -22,4 +22,11 @@ public final class TaskScheduleRules {
     public static long dueSoonAt(long dueAt) {
         return dueAt <= 0 ? 0 : dueAt - DUE_SOON_OFFSET_MILLIS;
     }
+
+    public static long nextDueSoonAt(long dueAt, long now) {
+        if (dueAt <= now) {
+            return 0;
+        }
+        return Math.max(now + 1_000L, dueSoonAt(dueAt));
+    }
 }

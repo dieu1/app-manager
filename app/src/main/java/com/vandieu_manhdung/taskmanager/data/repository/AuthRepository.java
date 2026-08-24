@@ -1,15 +1,19 @@
-package com.vandieu_manhdung.taskmanager.data.reponsitory;
+package com.vandieu_manhdung.taskmanager.data.repository;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserProfileChangeRequest;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.storage.FirebaseStorage;
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
+import com.vandieu_manhdung.taskmanager.BuildConfig;
 import com.vandieu_manhdung.taskmanager.core.util.AppExecutors;
 import com.vandieu_manhdung.taskmanager.data.local.dao.UserDao;
 import com.vandieu_manhdung.taskmanager.data.remote.FirebaseProvider;
@@ -148,6 +152,94 @@ public class AuthRepository {
         if (isConfigured()) {
             FirebaseProvider.auth(context).signOut();
         }
+    }
+
+    public void updateProfile(
+            String displayName,
+            Uri avatarUri,
+            RepositoryCallback<User> callback
+    ) {
+        String cleanName = requireText(displayName, "Vui lòng nhập tên hiển thị");
+        if (cleanName.length() > 100) {
+            callback.onError(new IllegalArgumentException("Tên hiển thị không được quá 100 ký tự"));
+            return;
+        }
+        FirebaseUser firebaseUser = FirebaseProvider.auth(context).getCurrentUser();
+        if (firebaseUser == null) {
+            callback.onError(new IllegalStateException("Bạn chưa đăng nhập"));
+            return;
+        }
+        if (avatarUri == null || !BuildConfig.CLOUD_STORAGE_ENABLED) {
+            persistUpdatedProfile(firebaseUser, cleanName, firebaseUser.getPhotoUrl(), callback);
+            return;
+        }
+        FirebaseStorage.getInstance().getReference()
+                .child("avatars/" + firebaseUser.getUid() + "/profile.jpg")
+                .putFile(avatarUri)
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful()) {
+                        throw task.getException() == null
+                                ? new IllegalStateException("Không thể tải ảnh đại diện")
+                                : task.getException();
+                    }
+                    return task.getResult().getStorage().getDownloadUrl();
+                })
+                .addOnSuccessListener(uri ->
+                        persistUpdatedProfile(firebaseUser, cleanName, uri, callback))
+                .addOnFailureListener(error -> callback.onError(mapError(error)));
+    }
+
+    private void persistUpdatedProfile(
+            FirebaseUser firebaseUser,
+            String displayName,
+            Uri avatarUri,
+            RepositoryCallback<User> callback
+    ) {
+        UserProfileChangeRequest request = new UserProfileChangeRequest.Builder()
+                .setDisplayName(displayName)
+                .setPhotoUri(avatarUri)
+                .build();
+        firebaseUser.updateProfile(request)
+                .addOnSuccessListener(ignored -> executors.database().execute(() -> {
+                    User user = userDao.findById(firebaseUser.getUid());
+                    if (user == null) {
+                        executors.mainThread().execute(() ->
+                                persistAuthenticatedUser(firebaseUser, callback));
+                        return;
+                    }
+                    user.setDisplayName(displayName);
+                    user.setAvatarUrl(avatarUri == null ? null : avatarUri.toString());
+                    user.setUpdatedAt(System.currentTimeMillis());
+                    executors.mainThread().execute(() -> persistUpdatedCloudProfile(user, callback));
+                }))
+                .addOnFailureListener(error -> callback.onError(mapError(error)));
+    }
+
+    private void persistUpdatedCloudProfile(User user, RepositoryCallback<User> callback) {
+        FirebaseFirestore firestore = FirebaseProvider.firestore(context);
+        var batch = firestore.batch();
+        batch.set(firestore.collection("users").document(user.getUserId()),
+                profileMap(user), SetOptions.merge());
+        batch.set(firestore.collection("user_codes").document(user.getUserCode()),
+                directoryMap(user), SetOptions.merge());
+        batch.commit().continueWithTask(task -> {
+                    if (!task.isSuccessful()) throw task.getException();
+                    return firestore.collection("workspace_members")
+                            .whereEqualTo("userId", user.getUserId()).get();
+                })
+                .addOnSuccessListener(snapshot -> {
+                    var memberBatch = firestore.batch();
+                    Map<String, Object> memberValues = new HashMap<>();
+                    memberValues.put("displayName", user.getDisplayName());
+                    memberValues.put("email", user.getEmail());
+                    memberValues.put("updatedAt", user.getUpdatedAt());
+                    snapshot.getDocuments().forEach(document ->
+                            memberBatch.set(document.getReference(), memberValues, SetOptions.merge()));
+                    memberBatch.commit()
+                            .addOnSuccessListener(done -> persistLocalUser(user, callback))
+                            .addOnFailureListener(error -> callback.onError(mapError(error)));
+                })
+                .addOnFailureListener(error -> callback.onError(mapError(error)));
     }
 
     private void persistAuthenticatedUser(
@@ -308,7 +400,9 @@ public class AuthRepository {
         directory.put("userCode", user.getUserCode());
         directory.put("userId", user.getUserId());
         directory.put("displayName", user.getDisplayName());
-        directory.put("email", user.getEmail());
+        // The public ID directory is only for resolving invitations. Keep the
+        // account email private in /users/{uid}, including for older entries.
+        directory.put("email", FieldValue.delete());
         directory.put("updatedAt", System.currentTimeMillis());
         return directory;
     }

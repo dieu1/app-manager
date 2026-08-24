@@ -8,7 +8,8 @@
     <EditText
         android:id="@+id/editTeamName"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="54dp"
+        android:background="@drawable/bg_team_input"
         android:hint="@string/team_name"
         android:importantForAutofill="no"
         android:inputType="textCapSentences"
@@ -18,11 +19,13 @@
         android:id="@+id/editTeamDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_team_input"
         android:gravity="top"
         android:hint="@string/team_description"
         android:importantForAutofill="no"
         android:inputType="textCapSentences|textMultiLine"
         android:maxLength="500"
-        android:minLines="3" />
+        android:minLines="3"
+        android:padding="14dp" />
 </LinearLayout>

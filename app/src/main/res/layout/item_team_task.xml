@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.TaskManager.Team.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="4dp"
+    android:layout_marginVertical="6dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">
@@ -12,37 +15,94 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="16dp">
 
-        <TextView
-            android:id="@+id/textTeamTaskTitle"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/textTeamTaskTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/team_text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                tools:text="Hoàn thiện luồng đăng nhập và phân quyền" />
+
+            <TextView
+                android:id="@+id/textTeamTaskStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/bg_team_badge_warning"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:textColor="@color/team_warning"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="Đang làm" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/textTeamTaskMeta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp" />
+            android:layout_marginTop="8dp"
+            android:textAppearance="@style/TextAppearance.TaskManager.Team.Body"
+            tools:text="Ứng dụng Android · Điểu Văn" />
 
-        <TextView
-            android:id="@+id/textTeamTaskStatus"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp" />
+            android:layout_marginTop="13dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/team_ui_member_caption"
+                android:textColor="@color/team_text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/textTeamTaskProgressLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/team_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                tools:text="65% hoàn thành" />
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/progressTeamTask"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="100" />
+            android:layout_height="7dp"
+            android:layout_marginTop="7dp"
+            android:max="100"
+            android:progressBackgroundTint="@color/team_surface_alt"
+            android:progressTint="@color/team_primary"
+            tools:progress="65" />
 
         <TextView
             android:id="@+id/textTeamTaskDueDate"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="11dp"
+            android:drawablePadding="6dp"
+            android:textColor="@color/team_text_secondary"
+            android:textSize="12sp"
+            app:drawableStartCompat="@drawable/ic_calendar"
+            app:drawableTint="@color/team_text_secondary"
+            tools:text="Hạn: 26/08/2026 17:00" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

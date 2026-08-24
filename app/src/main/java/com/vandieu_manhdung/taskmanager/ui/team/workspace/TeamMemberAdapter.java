@@ -4,8 +4,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.ProgressBar;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -13,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.model.WorkspaceMember;
 
+import java.util.Locale;
 import java.util.Objects;
 
 public class TeamMemberAdapter extends
@@ -62,29 +65,55 @@ public class TeamMemberAdapter extends
 
     class MemberViewHolder extends RecyclerView.ViewHolder {
         private final TextView name;
+        private final TextView code;
+        private final TextView initial;
         private final TextView role;
         private final TextView progress;
+        private final ProgressBar progressBar;
 
         MemberViewHolder(@NonNull View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.textMemberName);
+            code = itemView.findViewById(R.id.textMemberCode);
+            initial = itemView.findViewById(R.id.textMemberInitial);
             role = itemView.findViewById(R.id.textMemberRole);
             progress = itemView.findViewById(R.id.textMemberProgress);
+            progressBar = itemView.findViewById(R.id.progressMemberTasks);
         }
 
         void bind(WorkspaceMember member) {
-            name.setText(itemView.getContext().getString(
-                    R.string.member_name_code,
-                    member.getDisplayName(),
-                    member.getUserCode()));
-            role.setText(itemView.getContext().getString(
-                    R.string.member_role_value,
-                    formatRole(member.getRole())));
+            String displayName = member.getDisplayName();
+            name.setText(displayName);
+            code.setText(member.getUserCode());
+            initial.setText(displayName == null || displayName.isBlank()
+                    ? "T" : displayName.substring(0, 1).toUpperCase(Locale.getDefault()));
+            role.setText(formatRole(member.getRole()));
+            styleRole(member.getRole());
             progress.setText(itemView.getContext().getString(
                     R.string.member_task_progress,
                     member.getCompletedTasks(),
                     member.getTotalTasks()));
+            int completion = member.getTotalTasks() <= 0 ? 0
+                    : Math.round(member.getCompletedTasks() * 100f / member.getTotalTasks());
+            progressBar.setProgress(completion);
             itemView.setOnClickListener(view -> listener.onMemberClicked(member));
+        }
+
+        private void styleRole(String value) {
+            int background;
+            int color;
+            if ("OWNER".equals(value)) {
+                background = R.drawable.bg_team_badge_primary;
+                color = R.color.team_primary;
+            } else if ("ADMIN".equals(value)) {
+                background = R.drawable.bg_team_badge_info;
+                color = R.color.team_info;
+            } else {
+                background = R.drawable.bg_team_badge_neutral;
+                color = R.color.team_text_secondary;
+            }
+            role.setBackgroundResource(background);
+            role.setTextColor(ContextCompat.getColor(itemView.getContext(), color));
         }
 
         private String formatRole(String value) {

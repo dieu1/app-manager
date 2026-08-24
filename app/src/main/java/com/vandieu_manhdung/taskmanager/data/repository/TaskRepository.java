@@ -1,9 +1,11 @@
-package com.vandieu_manhdung.taskmanager.data.reponsitory;
+package com.vandieu_manhdung.taskmanager.data.repository;
 import android.content.Context;
 
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskPriority;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
+import com.vandieu_manhdung.taskmanager.core.constant.SyncStatus;
+import com.vandieu_manhdung.taskmanager.core.constant.TaskHistoryAction;
 import com.vandieu_manhdung.taskmanager.core.constant.WorkspaceType;
 import com.vandieu_manhdung.taskmanager.core.notification.TaskReminderScheduler;
 import com.vandieu_manhdung.taskmanager.core.util.AppExecutors;
@@ -11,10 +13,12 @@ import com.vandieu_manhdung.taskmanager.core.util.TaskRules;
 import com.vandieu_manhdung.taskmanager.core.util.TaskSubtaskRules;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TaskSubtaskDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.TaskHistoryDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.WorkspaceDao;
 import com.vandieu_manhdung.taskmanager.data.remote.CloudSyncManager;
 import com.vandieu_manhdung.taskmanager.model.PersonalDashboardSummary;
 import com.vandieu_manhdung.taskmanager.model.Task;
+import com.vandieu_manhdung.taskmanager.model.TaskHistory;
 import com.vandieu_manhdung.taskmanager.model.Workspace;
 
 import java.util.List;
@@ -25,6 +29,7 @@ public class TaskRepository {
 
     private final TaskDao taskDao;
     private final TaskSubtaskDao subtaskDao;
+    private final TaskHistoryDao historyDao;
     private final WorkspaceDao workspaceDao;
     private final AppExecutors executors;
     private final CloudSyncManager cloudSync;
@@ -36,6 +41,7 @@ public class TaskRepository {
 
         taskDao = new TaskDao(applicationContext);
         subtaskDao = new TaskSubtaskDao(applicationContext);
+        historyDao = new TaskHistoryDao(applicationContext);
         workspaceDao = new WorkspaceDao(applicationContext);
         executors = AppExecutors.getInstance();
         cloudSync = CloudSyncManager.getInstance(applicationContext);
@@ -63,6 +69,8 @@ public class TaskRepository {
                 );
             }
 
+            recordHistory(task.getTaskId(), task.getCreatedBy(),
+                    TaskHistoryAction.CREATED, "Đã tạo công việc");
             cloudSync.upsertTask(task, task.getCreatedBy());
             reminderScheduler.schedule(task);
             return task;
@@ -112,6 +120,7 @@ public class TaskRepository {
             task.setCreatedAt(
                     existingTask.getCreatedAt()
             );
+            task.setDeletedAt(existingTask.getDeletedAt());
 
             prepareCommonFields(task);
             applyAutomaticProgressIfNeeded(task);
@@ -120,6 +129,9 @@ public class TaskRepository {
             task.setUpdatedAt(
                     System.currentTimeMillis()
             );
+            task.setVersion(Math.max(1, existingTask.getVersion() + 1));
+            task.setSyncStatus(SyncStatus.PENDING);
+            updateCompletedAt(task);
 
             int updatedRows = taskDao.update(task);
 
@@ -129,6 +141,8 @@ public class TaskRepository {
                 );
             }
 
+            recordHistory(task.getTaskId(), task.getCreatedBy(),
+                    TaskHistoryAction.UPDATED, "Đã cập nhật thông tin công việc");
             cloudSync.upsertTask(task, task.getCreatedBy());
             reminderScheduler.schedule(task);
             return task;
@@ -162,7 +176,13 @@ public class TaskRepository {
 
             ensurePersonalTask(existingTask);
 
-            int deletedRows = taskDao.delete(taskId);
+            long now = System.currentTimeMillis();
+            existingTask.setDeletedAt(now);
+            existingTask.setUpdatedAt(now);
+            existingTask.setVersion(Math.max(1, existingTask.getVersion() + 1));
+            existingTask.setSyncStatus(SyncStatus.PENDING);
+            int deletedRows = taskDao.softDelete(
+                    taskId, now, existingTask.getVersion());
 
             if (deletedRows <= 0) {
                 throw new IllegalStateException(
@@ -170,7 +190,9 @@ public class TaskRepository {
                 );
             }
 
-            cloudSync.deleteTask(taskId);
+            recordHistory(taskId, existingTask.getCreatedBy(),
+                    TaskHistoryAction.DELETED, "Đã chuyển công việc vào thùng rác");
+            cloudSync.upsertTask(existingTask, existingTask.getCreatedBy());
             reminderScheduler.cancel(taskId);
             return true;
         }, callback);
@@ -294,12 +316,14 @@ public class TaskRepository {
                 normalizedProgress = existingTask.getProgress();
             }
 
-            int updatedRows =
-                    taskDao.updateStatusAndProgress(
-                            taskId,
-                            normalizedStatus,
-                            normalizedProgress
-                    );
+            existingTask.setStatus(normalizedStatus);
+            existingTask.setProgress(normalizedProgress);
+            existingTask.setUpdatedAt(System.currentTimeMillis());
+            existingTask.setVersion(Math.max(1, existingTask.getVersion() + 1));
+            existingTask.setSyncStatus(SyncStatus.PENDING);
+            updateCompletedAt(existingTask);
+
+            int updatedRows = taskDao.update(existingTask);
 
             if (updatedRows <= 0) {
                 throw new IllegalStateException(
@@ -307,15 +331,9 @@ public class TaskRepository {
                 );
             }
 
-            existingTask.setStatus(normalizedStatus);
-            existingTask.setProgress(
-                    normalizedProgress
-            );
-
-            existingTask.setUpdatedAt(
-                    System.currentTimeMillis()
-            );
-
+            recordHistory(taskId, existingTask.getCreatedBy(),
+                    TaskHistoryAction.STATUS_CHANGED,
+                    "Trạng thái: " + normalizedStatus + ", tiến độ: " + normalizedProgress + "%");
             cloudSync.upsertTask(existingTask, existingTask.getCreatedBy());
             reminderScheduler.schedule(existingTask);
             return existingTask;
@@ -374,6 +392,54 @@ public class TaskRepository {
             return taskDao.countPersonalTasks(
                     workspaceId
             );
+        }, callback);
+    }
+
+    public void getDeletedPersonalTasks(
+            String workspaceId,
+            RepositoryCallback<List<Task>> callback
+    ) {
+        executeInBackground(() -> {
+            ensurePersonalWorkspace(workspaceId);
+            return taskDao.findDeletedPersonalTasks(workspaceId);
+        }, callback);
+    }
+
+    public void restorePersonalTask(
+            String taskId,
+            RepositoryCallback<Task> callback
+    ) {
+        executeInBackground(() -> {
+            Task task = taskDao.findByIdIncludingDeleted(taskId);
+            if (task == null || task.getDeletedAt() <= 0) {
+                throw new IllegalStateException("Công việc không có trong thùng rác");
+            }
+            ensurePersonalTask(task);
+            long now = System.currentTimeMillis();
+            task.setDeletedAt(0);
+            task.setUpdatedAt(now);
+            task.setVersion(Math.max(1, task.getVersion() + 1));
+            task.setSyncStatus(SyncStatus.PENDING);
+            if (taskDao.restore(taskId, now, task.getVersion()) <= 0) {
+                throw new IllegalStateException("Không thể khôi phục công việc");
+            }
+            recordHistory(taskId, task.getCreatedBy(),
+                    TaskHistoryAction.RESTORED, "Đã khôi phục công việc từ thùng rác");
+            cloudSync.upsertTask(task, task.getCreatedBy());
+            reminderScheduler.schedule(task);
+            return task;
+        }, callback);
+    }
+
+    public void getTaskHistory(
+            String taskId,
+            RepositoryCallback<List<TaskHistory>> callback
+    ) {
+        executeInBackground(() -> {
+            Task task = taskDao.findByIdIncludingDeleted(taskId);
+            if (task == null) throw new IllegalStateException("Công việc không tồn tại");
+            ensurePersonalTask(task);
+            return historyDao.findByTask(taskId);
         }, callback);
     }
 
@@ -461,6 +527,23 @@ public class TaskRepository {
         }
 
         task.setUpdatedAt(currentTime);
+        task.setVersion(Math.max(1, task.getVersion()));
+        task.setSyncStatus(SyncStatus.PENDING);
+        task.setDeletedAt(0);
+        updateCompletedAt(task);
+    }
+
+    private void updateCompletedAt(Task task) {
+        if (TaskStatus.COMPLETED.equals(task.getStatus())) {
+            if (task.getCompletedAt() <= 0) task.setCompletedAt(System.currentTimeMillis());
+        } else {
+            task.setCompletedAt(0);
+        }
+    }
+
+    private void recordHistory(String taskId, String userId, String action, String detail) {
+        TaskHistory history = historyDao.add(taskId, userId, action, detail);
+        cloudSync.upsertTaskHistory(history);
     }
 
     /*

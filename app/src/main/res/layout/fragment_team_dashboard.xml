@@ -1,171 +1,359 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/team_background"
     tools:context=".ui.team.dashboard.TeamDashboardFragment">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
         android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="32dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonBackTeamDashboard"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/back" />
-
-            <TextView
-                android:id="@+id/textTeamDashboardTitle"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:background="@drawable/bg_team_hero"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-            <TextView
-                android:id="@+id/textTeamDashboardRate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-            <ProgressBar
-                android:id="@+id/progressTeamDashboardRate"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="100" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/buttonBackTeamDashboard"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:backgroundTint="@color/team_white_16"
+                        android:text="@string/back"
+                        android:textColor="@android:color/white"
+                        app:cornerRadius="13dp"
+                        app:icon="@drawable/ic_arrow_back"
+                        app:iconTint="@android:color/white" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <ImageButton
+                        android:id="@+id/buttonDashboardNotifications"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_team_white_translucent"
+                        android:contentDescription="@string/notifications"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_notifications"
+                        app:tint="@android:color/white" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="@string/team_ui_dashboard_eyebrow"
+                    android:textAppearance="@style/TextAppearance.TaskManager.Team.Eyebrow" />
+
+                <TextView
+                    android:id="@+id/textTeamDashboardTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textAppearance="@style/TextAppearance.TaskManager.Team.PageTitle"
+                    tools:text="Dashboard tiến độ · Android Team" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:text="@string/team_ui_dashboard_subtitle"
+                    android:textColor="@color/team_white_82"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/textTeamDashboardRate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    tools:text="Tiến độ hoàn thành toàn nhóm: 68%" />
+
+                <ProgressBar
+                    android:id="@+id/progressTeamDashboardRate"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="10dp"
+                    android:max="100"
+                    android:progressBackgroundTint="@color/team_white_16"
+                    android:progressTint="@android:color/white"
+                    tools:progress="68" />
+            </LinearLayout>
 
             <GridLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:columnCount="2"
                 android:rowCount="3">
 
                 <TextView
                     android:id="@+id/textTeamDashboardTotal"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
+                    android:layout_height="86dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="4dp"
-                    android:background="?attr/colorSurfaceContainer"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bg_team_stat_primary"
                     android:gravity="center"
-                    android:textStyle="bold" />
+                    android:padding="10dp"
+                    android:textColor="@color/team_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Tổng công việc\n24" />
 
                 <TextView
                     android:id="@+id/textTeamDashboardTodo"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
+                    android:layout_height="86dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="4dp"
-                    android:background="?attr/colorSurfaceContainer"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bg_team_stat_info"
                     android:gravity="center"
-                    android:textStyle="bold" />
+                    android:padding="10dp"
+                    android:textColor="@color/team_info"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Cần làm\n6" />
 
                 <TextView
                     android:id="@+id/textTeamDashboardInProgress"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
+                    android:layout_height="86dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="4dp"
-                    android:background="?attr/colorSurfaceContainer"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bg_team_stat_warning"
                     android:gravity="center"
-                    android:textStyle="bold" />
+                    android:padding="10dp"
+                    android:textColor="@color/team_warning"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Đang làm\n8" />
 
                 <TextView
                     android:id="@+id/textTeamDashboardCompleted"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
+                    android:layout_height="86dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="4dp"
-                    android:background="?attr/colorSurfaceContainer"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bg_team_stat_success"
                     android:gravity="center"
-                    android:textStyle="bold" />
+                    android:padding="10dp"
+                    android:textColor="@color/team_success"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Hoàn thành\n10" />
 
                 <TextView
                     android:id="@+id/textTeamDashboardCancelled"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
+                    android:layout_height="86dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="4dp"
-                    android:background="?attr/colorSurfaceContainer"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bg_team_stat_primary"
                     android:gravity="center"
-                    android:textStyle="bold" />
+                    android:padding="10dp"
+                    android:textColor="@color/team_text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Đã hủy\n0" />
 
                 <TextView
                     android:id="@+id/textTeamDashboardOverdue"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
+                    android:layout_height="86dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="4dp"
-                    android:background="?attr/colorSurfaceContainer"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bg_team_stat_danger"
                     android:gravity="center"
-                    android:textColor="@color/task_overdue"
-                    android:textStyle="bold" />
+                    android:padding="10dp"
+                    android:textColor="@color/team_danger"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="Quá hạn\n2" />
             </GridLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="20dp"
                 android:text="@string/progress_by_project"
-                android:textSize="19sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.TaskManager.Team.SectionTitle" />
 
             <TextView
                 android:id="@+id/textDashboardNoProjects"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_team_input"
                 android:gravity="center"
-                android:padding="12dp"
+                android:padding="20dp"
                 android:text="@string/no_projects"
+                android:textAppearance="@style/TextAppearance.TaskManager.Team.Body"
                 android:visibility="gone" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recyclerDashboardProjects"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:nestedScrollingEnabled="false"
                 tools:listitem="@layout/item_team_project_progress" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.TaskManager.Team.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="@color/team_info_soft"
+                    app:strokeWidth="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="15dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/upcoming_team_tasks"
+                            android:textColor="@color/team_info"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/textUpcomingTeamTasks"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@color/team_text_primary"
+                            android:textSize="13sp"
+                            tools:text="• Thiết kế màn Team · 26/08 17:00" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.TaskManager.Team.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="@color/team_warning_soft"
+                    app:strokeWidth="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="15dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/team_workload_warning"
+                            android:textColor="@color/team_warning"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/textTeamWorkloadWarnings"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@color/team_text_primary"
+                            android:textSize="13sp"
+                            tools:text="• Minh: 6 công việc chưa hoàn thành" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="24dp"
+                android:text="@string/team_gantt_timeline"
+                android:textAppearance="@style/TextAppearance.TaskManager.Team.SectionTitle" />
+
+            <HorizontalScrollView
+                android:id="@+id/scrollTeamGantt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_team_input"
+                android:fillViewport="true"
+                android:scrollbars="horizontal">
+
+                <com.vandieu_manhdung.taskmanager.ui.team.dashboard.TeamGanttChartView
+                    android:id="@+id/viewTeamGantt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </HorizontalScrollView>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
                 android:text="@string/progress_by_member"
-                android:textSize="19sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.TaskManager.Team.SectionTitle" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recyclerDashboardMembers"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:nestedScrollingEnabled="false"
                 tools:listitem="@layout/item_team_member" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonRefreshTeamDashboard"
+                style="@style/Widget.TaskManager.Team.Button.Tonal"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/refresh" />
+                android:layout_marginTop="18dp"
+                android:text="@string/refresh"
+                app:icon="@drawable/ic_refresh" />
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
     <ProgressBar
         android:id="@+id/progressLoadingTeamDashboard"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
+        android:indeterminateTint="@color/team_primary"
         android:visibility="gone" />
 </FrameLayout>

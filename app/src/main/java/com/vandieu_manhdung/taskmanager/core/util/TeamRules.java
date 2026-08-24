@@ -3,6 +3,8 @@ package com.vandieu_manhdung.taskmanager.core.util;
 import com.vandieu_manhdung.taskmanager.core.constant.TeamRole;
 import com.vandieu_manhdung.taskmanager.model.Task;
 
+import java.util.List;
+
 public final class TeamRules {
 
     private TeamRules() {
@@ -37,10 +39,20 @@ public final class TeamRules {
             Task task,
             String assigneeId
     ) {
+        return canEditTask(role, actorId, task,
+                assigneeId == null ? List.of() : List.of(assigneeId));
+    }
+
+    public static boolean canEditTask(
+            String role,
+            String actorId,
+            Task task,
+            List<String> assigneeIds
+    ) {
         return canManageMembers(role) ||
                 actorId != null && task != null &&
                         (actorId.equals(task.getCreatedBy()) ||
-                                actorId.equals(assigneeId));
+                                assigneeIds.contains(actorId));
     }
 
     public static boolean canDeleteTask(

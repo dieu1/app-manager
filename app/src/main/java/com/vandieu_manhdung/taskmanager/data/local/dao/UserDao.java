@@ -9,8 +9,9 @@ import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.Use
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.ProjectTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.TaskAssigneeTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.TaskTable;
+import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.TaskHistoryTable;
+import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.NotificationTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.TeamInviteTable;
-import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.WorkSessionTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.WorkspaceMemberTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.WorkspaceTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.TaskManagerDatabaseHelper;
@@ -75,8 +76,10 @@ public class UserDao {
                     WorkspaceTable.MANAGER_ID, oldUserId, newUserId);
             updateReference(database, TaskTable.TABLE_NAME,
                     TaskTable.CREATED_BY, oldUserId, newUserId);
-            updateReference(database, WorkSessionTable.TABLE_NAME,
-                    WorkSessionTable.USER_ID, oldUserId, newUserId);
+            updateReference(database, TaskHistoryTable.TABLE_NAME,
+                    TaskHistoryTable.USER_ID, oldUserId, newUserId);
+            updateReference(database, NotificationTable.TABLE_NAME,
+                    NotificationTable.USER_ID, oldUserId, newUserId);
             updateReference(database, WorkspaceMemberTable.TABLE_NAME,
                     WorkspaceMemberTable.USER_ID, oldUserId, newUserId);
             updateReference(database, TeamInviteTable.TABLE_NAME,

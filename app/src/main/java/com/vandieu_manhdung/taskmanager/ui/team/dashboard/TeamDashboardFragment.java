@@ -18,6 +18,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.vandieu_manhdung.taskmanager.R;
 import com.vandieu_manhdung.taskmanager.model.TeamDashboardData;
 import com.vandieu_manhdung.taskmanager.model.TeamDashboardSummary;
+import com.vandieu_manhdung.taskmanager.model.TeamTaskItem;
+import com.vandieu_manhdung.taskmanager.model.WorkspaceMember;
+import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
+import com.vandieu_manhdung.taskmanager.ui.main.MainActivity;
 import com.vandieu_manhdung.taskmanager.ui.team.workspace.TeamMemberAdapter;
 
 public class TeamDashboardFragment extends Fragment {
@@ -28,6 +32,7 @@ public class TeamDashboardFragment extends Fragment {
     private TeamDashboardViewModel viewModel;
     private TeamProjectProgressAdapter projectAdapter;
     private TeamMemberAdapter memberAdapter;
+    private TeamGanttChartView ganttChart;
     private ProgressBar loading;
 
     public static TeamDashboardFragment newInstance(String workspaceId, String userId) {
@@ -66,9 +71,12 @@ public class TeamDashboardFragment extends Fragment {
         memberList.setAdapter(memberAdapter);
         projectList.setNestedScrollingEnabled(false);
         memberList.setNestedScrollingEnabled(false);
+        ganttChart = view.findViewById(R.id.viewTeamGantt);
 
         view.findViewById(R.id.buttonBackTeamDashboard).setOnClickListener(
                 button -> getParentFragmentManager().popBackStack());
+        view.findViewById(R.id.buttonDashboardNotifications).setOnClickListener(
+                button -> ((MainActivity) requireActivity()).openNotifications());
         view.findViewById(R.id.buttonRefreshTeamDashboard).setOnClickListener(
                 button -> viewModel.load());
 
@@ -104,8 +112,46 @@ public class TeamDashboardFragment extends Fragment {
 
         projectAdapter.submitList(data.getProjectProgress());
         memberAdapter.submitList(data.getSnapshot().getMembers());
+        java.util.List<TeamTaskItem> timelineItems = new java.util.ArrayList<>(
+                data.getSnapshot().getTasks());
+        timelineItems.sort(java.util.Comparator.comparingLong(item ->
+                item.getTask().getStartDate() <= 0 ? Long.MAX_VALUE : item.getTask().getStartDate()));
+        ganttChart.setItems(timelineItems);
+        renderUpcoming(view, timelineItems);
+        renderWorkload(view, data.getSnapshot().getMembers());
         view.findViewById(R.id.textDashboardNoProjects).setVisibility(
                 data.getProjectProgress().isEmpty() ? View.VISIBLE : View.GONE);
+    }
+
+    private void renderUpcoming(View view, java.util.List<TeamTaskItem> items) {
+        long now = System.currentTimeMillis();
+        long sevenDays = now + 7L * 24 * 60 * 60 * 1000;
+        java.text.SimpleDateFormat format = new java.text.SimpleDateFormat(
+                "dd/MM HH:mm", java.util.Locale.getDefault());
+        StringBuilder text = new StringBuilder();
+        for (TeamTaskItem item : items) {
+            long due = item.getTask().getDueDate();
+            if (due <= 0 || due > sevenDays || TaskStatus.COMPLETED.equals(item.getTask().getStatus()) ||
+                    TaskStatus.CANCELLED.equals(item.getTask().getStatus())) continue;
+            if (text.length() > 0) text.append("\n");
+            text.append("• ").append(item.getTask().getTitle()).append(" · ")
+                    .append(format.format(new java.util.Date(due)));
+        }
+        view.<android.widget.TextView>findViewById(R.id.textUpcomingTeamTasks)
+                .setText(text.length() == 0 ? getString(R.string.no_upcoming_team_tasks) : text);
+    }
+
+    private void renderWorkload(View view, java.util.List<WorkspaceMember> members) {
+        StringBuilder text = new StringBuilder();
+        for (WorkspaceMember member : members) {
+            int active = Math.max(0, member.getTotalTasks() - member.getCompletedTasks());
+            if (active < 5) continue;
+            if (text.length() > 0) text.append("\n");
+            text.append("• ").append(member.getDisplayName()).append(": ")
+                    .append(active).append(" công việc chưa hoàn thành");
+        }
+        view.<android.widget.TextView>findViewById(R.id.textTeamWorkloadWarnings)
+                .setText(text.length() == 0 ? getString(R.string.no_workload_warning) : text);
     }
 
     private void setCount(View view, int viewId, int labelId, int value) {

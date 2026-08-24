@@ -1,0 +1,12 @@
+{
+  "name": "taskmanager-firebase-rules-tests",
+  "private": true,
+  "scripts": {
+    "test": "mocha --timeout 15000 firestore.rules.test.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.18.0",
+    "mocha": "11.8.0"
+  }
+}

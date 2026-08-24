@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.TaskManager.Team.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="3dp"
+    android:layout_marginVertical="5dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">
@@ -11,23 +13,87 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="14dp">
 
         <TextView
-            android:id="@+id/textMemberName"
-            android:layout_width="match_parent"
+            android:id="@+id/textMemberInitial"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_team_avatar"
+            android:gravity="center"
+            android:textColor="@color/team_primary"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            tools:text="D" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:textStyle="bold" />
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/textMemberRole"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/textMemberProgress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+                <TextView
+                    android:id="@+id/textMemberName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/team_text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="Điểu Văn" />
+
+                <TextView
+                    android:id="@+id/textMemberRole"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_team_badge_primary"
+                    android:paddingHorizontal="9dp"
+                    android:paddingVertical="4dp"
+                    android:textColor="@color/team_primary"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    tools:text="Chủ nhóm" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/textMemberCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/team_text_secondary"
+                android:textSize="12sp"
+                tools:text="USR-A1B2C3D4E5F6" />
+
+            <TextView
+                android:id="@+id/textMemberProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/team_text_secondary"
+                android:textSize="12sp"
+                tools:text="Đã hoàn thành 8/10 công việc" />
+
+            <ProgressBar
+                android:id="@+id/progressMemberTasks"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="6dp"
+                android:max="100"
+                android:progressBackgroundTint="@color/team_surface_alt"
+                android:progressTint="@color/team_secondary"
+                tools:progress="80" />
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

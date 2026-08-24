@@ -16,6 +16,7 @@ public class TeamWorkspaceSnapshot {
     private final int totalTasks;
     private final int completedTasks;
     private final int overdueTasks;
+    private final boolean hasMoreTasks;
 
     public TeamWorkspaceSnapshot(
             Workspace workspace,
@@ -25,6 +26,20 @@ public class TeamWorkspaceSnapshot {
             List<TeamTaskItem> tasks,
             List<TeamTaskItem> summaryTasks,
             long currentTime
+    ) {
+        this(workspace, currentRole, members, projects, tasks, summaryTasks,
+                currentTime, false);
+    }
+
+    public TeamWorkspaceSnapshot(
+            Workspace workspace,
+            String currentRole,
+            List<WorkspaceMember> members,
+            List<Project> projects,
+            List<TeamTaskItem> tasks,
+            List<TeamTaskItem> summaryTasks,
+            long currentTime,
+            boolean hasMoreTasks
     ) {
         this.workspace = workspace;
         this.currentRole = currentRole;
@@ -47,6 +62,7 @@ public class TeamWorkspaceSnapshot {
         }
         completedTasks = completed;
         overdueTasks = overdue;
+        this.hasMoreTasks = hasMoreTasks;
     }
 
     public Workspace getWorkspace() {
@@ -79,5 +95,9 @@ public class TeamWorkspaceSnapshot {
 
     public int getOverdueTasks() {
         return overdueTasks;
+    }
+
+    public boolean hasMoreTasks() {
+        return hasMoreTasks;
     }
 }

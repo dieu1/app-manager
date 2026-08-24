@@ -169,6 +169,12 @@ public class TaskFormFragment extends Fragment {
                                 .popBackStack()
                 );
 
+        view.findViewById(R.id.buttonCancelTaskTop)
+                .setOnClickListener(
+                        button -> getParentFragmentManager()
+                                .popBackStack()
+                );
+
         buttonSave.setOnClickListener(
                 button -> saveTask()
         );

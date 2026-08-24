@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="#F8F9FE" android:padding="20dp">
+    <TextView android:id="@+id/buttonTrashBack" android:layout_width="wrap_content"
+        android:layout_height="48dp" android:gravity="center_vertical"
+        android:text="@string/back" android:textColor="@color/purple_primary" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/task_trash" android:textColor="@color/task_navy"
+        android:textSize="26sp" android:textStyle="bold" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="6dp" android:text="@string/task_trash_hint"
+        android:textColor="@color/task_text_secondary" />
+    <TextView android:id="@+id/textTrashEmpty" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="48dp" android:gravity="center"
+        android:text="@string/task_trash_empty" android:textColor="@color/task_text_secondary" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerTrash"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:layout_marginTop="12dp" />
+</LinearLayout>

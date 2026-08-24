@@ -1,4 +1,4 @@
-package com.vandieu_manhdung.taskmanager.data.reponsitory;
+package com.vandieu_manhdung.taskmanager.data.repository;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
@@ -10,26 +10,36 @@ import com.vandieu_manhdung.taskmanager.core.constant.ProjectStatus;
 import com.vandieu_manhdung.taskmanager.core.constant.TeamRole;
 import com.vandieu_manhdung.taskmanager.core.constant.WorkspaceStatus;
 import com.vandieu_manhdung.taskmanager.core.constant.WorkspaceType;
+import com.vandieu_manhdung.taskmanager.core.constant.SyncStatus;
+import com.vandieu_manhdung.taskmanager.core.constant.TaskHistoryAction;
+import com.vandieu_manhdung.taskmanager.core.notification.TaskReminderScheduler;
 import com.vandieu_manhdung.taskmanager.core.util.AppExecutors;
 import com.vandieu_manhdung.taskmanager.core.util.TaskRules;
 import com.vandieu_manhdung.taskmanager.core.util.TeamRules;
+import com.vandieu_manhdung.taskmanager.core.util.TeamFeatureRules;
 import com.vandieu_manhdung.taskmanager.core.util.UserCodeRules;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TeamDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.UserDao;
 import com.vandieu_manhdung.taskmanager.data.local.dao.WorkspaceDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.NotificationDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.TaskHistoryDao;
 import com.vandieu_manhdung.taskmanager.data.local.database.TaskManagerDatabaseHelper;
 import com.vandieu_manhdung.taskmanager.data.remote.CloudSyncManager;
 import com.vandieu_manhdung.taskmanager.model.Project;
+import com.vandieu_manhdung.taskmanager.model.ProjectMilestone;
 import com.vandieu_manhdung.taskmanager.model.Task;
 import com.vandieu_manhdung.taskmanager.model.TeamInvite;
 import com.vandieu_manhdung.taskmanager.model.TeamTaskItem;
 import com.vandieu_manhdung.taskmanager.model.TeamWorkspaceSnapshot;
+import com.vandieu_manhdung.taskmanager.model.TaskHistory;
 import com.vandieu_manhdung.taskmanager.model.User;
 import com.vandieu_manhdung.taskmanager.model.Workspace;
 import com.vandieu_manhdung.taskmanager.model.WorkspaceMember;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -42,6 +52,9 @@ public class TeamRepository {
     private final TeamDao teamDao;
     private final AppExecutors executors;
     private final CloudSyncManager cloudSync;
+    private final NotificationDao notificationDao;
+    private final TaskHistoryDao historyDao;
+    private final TaskReminderScheduler reminderScheduler;
 
     public TeamRepository(Context context) {
         Context appContext = context.getApplicationContext();
@@ -52,6 +65,9 @@ public class TeamRepository {
         teamDao = new TeamDao(appContext);
         executors = AppExecutors.getInstance();
         cloudSync = CloudSyncManager.getInstance(appContext);
+        notificationDao = new NotificationDao(appContext);
+        historyDao = new TaskHistoryDao(appContext);
+        reminderScheduler = new TaskReminderScheduler(appContext);
     }
 
     public void getTeams(
@@ -145,10 +161,13 @@ public class TeamRepository {
             if (!TeamRules.canManageWorkspace(actor.getRole())) {
                 throw new SecurityException("Chỉ chủ nhóm được giải tán nhóm");
             }
-            if (workspaceDao.delete(workspaceId) <= 0) {
+            Workspace workspace = requireTeam(workspaceId);
+            workspace.setStatus(WorkspaceStatus.ARCHIVED);
+            workspace.setUpdatedAt(System.currentTimeMillis());
+            if (workspaceDao.update(workspace) <= 0) {
                 throw new IllegalStateException("Không thể giải tán nhóm");
             }
-            cloudSync.archiveWorkspace(workspaceId);
+            cloudSync.upsertWorkspace(workspace, actorId, actor.getRole());
             return true;
         }, callback);
     }
@@ -188,12 +207,52 @@ public class TeamRepository {
         }, callback);
     }
 
+    public void getTeamTask(
+            String taskId,
+            String actorId,
+            RepositoryCallback<TeamTaskItem> callback
+    ) {
+        execute(() -> {
+            TeamTaskItem item = teamDao.findTeamTaskById(requireText(taskId, "Thiếu công việc"));
+            if (item == null) throw new IllegalStateException("Công việc không tồn tại");
+            requireActiveMember(item.getTask().getWorkspaceId(), actorId);
+            return item;
+        }, callback);
+    }
+
+    public void getTeamSnapshotPage(
+            String workspaceId,
+            String actorId,
+            String projectFilter,
+            String assigneeFilter,
+            String statusFilter,
+            int visibleLimit,
+            RepositoryCallback<TeamWorkspaceSnapshot> callback
+    ) {
+        execute(() -> {
+            Workspace workspace = requireTeam(workspaceId);
+            WorkspaceMember actor = requireActiveMember(workspaceId, actorId);
+            int safeLimit = Math.max(1, visibleLimit);
+            List<TeamTaskItem> page = teamDao.queryTeamTasks(
+                    workspaceId, projectFilter, assigneeFilter, statusFilter,
+                    safeLimit + 1);
+            boolean hasMore = page.size() > safeLimit;
+            if (hasMore) page = new ArrayList<>(page.subList(0, safeLimit));
+            List<TeamTaskItem> allTasks = teamDao.queryTeamTasks(
+                    workspaceId, null, null, null);
+            return new TeamWorkspaceSnapshot(
+                    workspace, actor.getRole(), teamDao.findMembers(workspaceId),
+                    teamDao.findProjects(workspaceId), page, allTasks,
+                    System.currentTimeMillis(), hasMore);
+        }, callback);
+    }
+
     public void addMember(
             String workspaceId,
             String actorId,
             String userCode,
             String role,
-            RepositoryCallback<WorkspaceMember> callback
+            RepositoryCallback<TeamInvite> callback
     ) {
         final String normalizedUserCode;
         try {
@@ -226,12 +285,24 @@ public class TeamRepository {
                                     "Không tìm thấy tài khoản có mã này"));
                             return;
                         }
-                        execute(() -> addRegisteredMember(
-                                workspaceId,
-                                actorId,
-                                user,
-                                role
-                        ), callback);
+                        execute(() -> createPendingInvite(
+                                workspaceId, actorId, user, role),
+                                new RepositoryCallback<TeamInvite>() {
+                                    @Override
+                                    public void onSuccess(TeamInvite invite) {
+                                        cloudSync.upsertInvite(invite, new RepositoryCallback<Boolean>() {
+                                            @Override public void onSuccess(Boolean ignored) {
+                                                callback.onSuccess(invite);
+                                            }
+                                            @Override public void onError(Exception exception) {
+                                                callback.onError(exception);
+                                            }
+                                        });
+                                    }
+                                    @Override public void onError(Exception exception) {
+                                        callback.onError(exception);
+                                    }
+                                });
                     }
 
                     @Override
@@ -242,7 +313,7 @@ public class TeamRepository {
         );
     }
 
-    private WorkspaceMember addRegisteredMember(
+    private TeamInvite createPendingInvite(
             String workspaceId,
             String actorId,
             User user,
@@ -266,43 +337,87 @@ public class TeamRepository {
         }
 
         long now = System.currentTimeMillis();
-        WorkspaceMember member = new WorkspaceMember();
-        member.setWorkspaceId(workspaceId);
-        member.setUserId(user.getUserId());
-        member.setUserCode(user.getUserCode());
-        member.setRole(role);
-        member.setStatus(MembershipStatus.ACTIVE);
-        member.setJoinedAt(now);
-        member.setDisplayName(user.getDisplayName());
-        member.setEmail(user.getEmail());
+        if (teamDao.findPendingInvite(workspaceId, user.getUserId()) != null) {
+            throw new IllegalStateException("Đã có lời mời đang chờ phản hồi");
+        }
 
         TeamInvite invite = new TeamInvite();
         invite.setInviteId(UUID.randomUUID().toString());
         invite.setWorkspaceId(workspaceId);
         invite.setEmail(user.getEmail());
+        invite.setInvitedUserId(user.getUserId());
+        invite.setInvitedUserCode(user.getUserCode());
+        invite.setInvitedDisplayName(user.getDisplayName());
+        invite.setWorkspaceName(requireTeam(workspaceId).getName());
         invite.setRole(role);
-        invite.setStatus(InviteStatus.ACCEPTED);
+        invite.setStatus(InviteStatus.PENDING);
         invite.setInvitedBy(actorId);
         invite.setCreatedAt(now);
-        invite.setRespondedAt(now);
+        invite.setRespondedAt(0);
+        invite.setExpiresAt(now + 7L * 24 * 60 * 60 * 1000);
 
         if (!userDao.saveAuthenticatedUser(user)) {
             throw new IllegalStateException("Không thể lưu tài khoản thành viên");
         }
 
-        SQLiteDatabase database = databaseHelper.getWritableDatabase();
-        database.beginTransaction();
-        try {
-            if (!teamDao.insertInvite(invite) || !teamDao.insertMember(member)) {
-                throw new IllegalStateException("Không thể thêm thành viên");
-            }
-            database.setTransactionSuccessful();
-        } finally {
-            database.endTransaction();
+        if (!teamDao.insertInvite(invite)) {
+            throw new IllegalStateException("Không thể tạo lời mời");
         }
-        cloudSync.upsertMember(member);
-        return member;
+        return invite;
     }
+
+    public void getPendingInvites(
+            String userId,
+            RepositoryCallback<List<TeamInvite>> callback
+    ) {
+        execute(() -> teamDao.findPendingInvitesForUser(
+                requireText(userId, "Thiếu người dùng hiện tại"),
+                System.currentTimeMillis()), callback);
+    }
+
+    public void respondToInvite(
+            String inviteId,
+            String userId,
+            boolean accept,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            TeamInvite invite = teamDao.findInvite(requireText(inviteId, "Thiếu lời mời"));
+            if (invite == null || !userId.equals(invite.getInvitedUserId())) {
+                throw new SecurityException("Lời mời không hợp lệ");
+            }
+            if (!InviteStatus.PENDING.equals(invite.getStatus())) {
+                throw new IllegalStateException("Lời mời đã được phản hồi");
+            }
+            if (!TeamFeatureRules.canRespondToInvite(invite, userId, System.currentTimeMillis())) {
+                teamDao.updateInviteStatus(inviteId, InviteStatus.EXPIRED, System.currentTimeMillis());
+                throw new IllegalStateException("Lời mời đã hết hạn");
+            }
+            User user = userDao.findById(userId);
+            if (user == null) throw new IllegalStateException("Không tìm thấy tài khoản");
+            return new InviteResponse(invite, user);
+        }, new RepositoryCallback<InviteResponse>() {
+            @Override public void onSuccess(InviteResponse response) {
+                cloudSync.respondToInvite(response.invite, response.user, accept,
+                        new RepositoryCallback<Boolean>() {
+                            @Override public void onSuccess(Boolean result) {
+                                executors.database().execute(() -> {
+                                    teamDao.updateInviteStatus(inviteId,
+                                            accept ? InviteStatus.ACCEPTED : InviteStatus.REJECTED,
+                                            System.currentTimeMillis());
+                                    executors.mainThread().execute(() -> callback.onSuccess(true));
+                                });
+                            }
+                            @Override public void onError(Exception exception) {
+                                callback.onError(exception);
+                            }
+                        });
+            }
+            @Override public void onError(Exception exception) { callback.onError(exception); }
+        });
+    }
+
+    private record InviteResponse(TeamInvite invite, User user) { }
 
     public void changeMemberRole(
             String workspaceId,
@@ -376,6 +491,64 @@ public class TeamRepository {
         }, callback);
     }
 
+    public void leaveTeam(
+            String workspaceId,
+            String userId,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            requireTeam(workspaceId);
+            WorkspaceMember member = requireActiveMember(workspaceId, userId);
+            if (TeamRole.OWNER.equals(member.getRole())) {
+                throw new IllegalStateException("Hãy chuyển quyền chủ nhóm trước khi rời nhóm");
+            }
+            teamDao.clearMemberAssignments(workspaceId, userId);
+            if (teamDao.removeMember(workspaceId, userId) <= 0) {
+                throw new IllegalStateException("Không thể rời nhóm");
+            }
+            cloudSync.removeMember(workspaceId, userId);
+            return true;
+        }, callback);
+    }
+
+    public void transferOwnership(
+            String workspaceId,
+            String ownerId,
+            String newOwnerId,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            Workspace workspace = requireTeam(workspaceId);
+            WorkspaceMember owner = requireActiveMember(workspaceId, ownerId);
+            WorkspaceMember target = requireActiveMember(workspaceId, newOwnerId);
+            if (!TeamRole.OWNER.equals(owner.getRole())) {
+                throw new SecurityException("Chỉ chủ nhóm được chuyển quyền");
+            }
+            if (ownerId.equals(newOwnerId)) {
+                throw new IllegalArgumentException("Người này đã là chủ nhóm");
+            }
+            SQLiteDatabase database = databaseHelper.getWritableDatabase();
+            database.beginTransaction();
+            try {
+                teamDao.updateMemberRole(workspaceId, ownerId, TeamRole.ADMIN);
+                teamDao.updateMemberRole(workspaceId, newOwnerId, TeamRole.OWNER);
+                workspace.setManagerId(newOwnerId);
+                workspace.setUpdatedAt(System.currentTimeMillis());
+                if (workspaceDao.update(workspace) <= 0) {
+                    throw new IllegalStateException("Không thể chuyển quyền chủ nhóm");
+                }
+                database.setTransactionSuccessful();
+            } finally {
+                database.endTransaction();
+            }
+            owner.setRole(TeamRole.ADMIN);
+            target.setRole(TeamRole.OWNER);
+            cloudSync.upsertWorkspace(workspace, newOwnerId, TeamRole.OWNER);
+            cloudSync.upsertMember(owner);
+            return true;
+        }, callback);
+    }
+
     public void createProject(
             String workspaceId,
             String actorId,
@@ -383,23 +556,59 @@ public class TeamRepository {
             String description,
             RepositoryCallback<Project> callback
     ) {
+        saveProject(null, workspaceId, actorId, name, description,
+                0, 0, actorId, ProjectStatus.ACTIVE, callback);
+    }
+
+    public void saveProject(
+            String projectId,
+            String workspaceId,
+            String actorId,
+            String name,
+            String description,
+            long startDate,
+            long dueDate,
+            String managerId,
+            String status,
+            RepositoryCallback<Project> callback
+    ) {
         execute(() -> {
             requireTeam(workspaceId);
             WorkspaceMember actor = requireActiveMember(workspaceId, actorId);
             if (!TeamRules.canManageProjects(actor.getRole())) {
-                throw new SecurityException("Bạn không có quyền tạo dự án");
+                throw new SecurityException("Bạn không có quyền quản lý dự án");
             }
+            if (!TeamFeatureRules.isValidSchedule(startDate, dueDate)) {
+                throw new IllegalArgumentException("Hạn dự án phải sau thời gian bắt đầu");
+            }
+            String cleanManagerId = isBlank(managerId) ? actorId : managerId;
+            requireActiveMember(workspaceId, cleanManagerId);
             long now = System.currentTimeMillis();
-            Project project = new Project();
-            project.setProjectId(UUID.randomUUID().toString());
+            Project project = isBlank(projectId)
+                    ? new Project() : teamDao.findProjectById(projectId);
+            boolean editing = project != null && !isBlank(project.getProjectId());
+            if (project == null) throw new IllegalStateException("Dự án không tồn tại");
+            if (!editing) {
+                project.setProjectId(UUID.randomUUID().toString());
+                project.setCreatedBy(actorId);
+                project.setCreatedAt(now);
+                project.setVersion(1);
+            } else if (!workspaceId.equals(project.getWorkspaceId())) {
+                throw new SecurityException("Dự án không thuộc nhóm này");
+            }
             project.setWorkspaceId(workspaceId);
             project.setName(requireText(name, "Tên dự án không được để trống"));
             project.setDescription(cleanText(description));
-            project.setStatus(ProjectStatus.ACTIVE);
-            project.setCreatedBy(actorId);
-            project.setCreatedAt(now);
+            project.setStatus(isBlank(status) ? ProjectStatus.ACTIVE : status);
+            project.setManagerId(cleanManagerId);
+            project.setStartDate(startDate);
+            project.setDueDate(dueDate);
+            project.setCompletedAt(ProjectStatus.COMPLETED.equals(project.getStatus()) ? now : 0);
+            project.setDeletedAt(0);
+            project.setVersion(Math.max(1, project.getVersion() + (editing ? 1 : 0)));
+            project.setSyncStatus(SyncStatus.PENDING);
             project.setUpdatedAt(now);
-            if (!teamDao.insertProject(project)) {
+            if (!(editing ? teamDao.updateProject(project) > 0 : teamDao.insertProject(project))) {
                 throw new IllegalStateException("Không thể tạo dự án; tên có thể đã tồn tại");
             }
             cloudSync.upsertProject(project);
@@ -407,9 +616,114 @@ public class TeamRepository {
         }, callback);
     }
 
+    public void archiveProject(
+            String projectId,
+            String workspaceId,
+            String actorId,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            WorkspaceMember actor = requireActiveMember(workspaceId, actorId);
+            if (!TeamRules.canManageProjects(actor.getRole())) {
+                throw new SecurityException("Bạn không có quyền lưu trữ dự án");
+            }
+            Project project = teamDao.findProjectById(projectId);
+            if (project == null || !workspaceId.equals(project.getWorkspaceId())) {
+                throw new IllegalStateException("Dự án không tồn tại");
+            }
+            project.setStatus(ProjectStatus.ARCHIVED);
+            project.setUpdatedAt(System.currentTimeMillis());
+            project.setVersion(Math.max(1, project.getVersion() + 1));
+            project.setSyncStatus(SyncStatus.PENDING);
+            if (teamDao.updateProject(project) <= 0) {
+                throw new IllegalStateException("Không thể lưu trữ dự án");
+            }
+            cloudSync.upsertProject(project);
+            return true;
+        }, callback);
+    }
+
+    public void completeProject(
+            String projectId, String workspaceId, String actorId,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            WorkspaceMember actor = requireActiveMember(workspaceId, actorId);
+            if (!TeamRules.canManageProjects(actor.getRole())) {
+                throw new SecurityException("Bạn không có quyền hoàn thành dự án");
+            }
+            Project project = teamDao.findProjectById(projectId);
+            if (project == null) throw new IllegalStateException("Dự án không tồn tại");
+            project.setStatus(ProjectStatus.COMPLETED);
+            project.setCompletedAt(System.currentTimeMillis());
+            project.setUpdatedAt(System.currentTimeMillis());
+            project.setVersion(Math.max(1, project.getVersion() + 1));
+            project.setSyncStatus(SyncStatus.PENDING);
+            teamDao.updateProject(project);
+            cloudSync.upsertProject(project);
+            return true;
+        }, callback);
+    }
+
+    public void getMilestones(
+            String projectId, String workspaceId, String actorId,
+            RepositoryCallback<List<ProjectMilestone>> callback
+    ) {
+        execute(() -> {
+            requireActiveMember(workspaceId, actorId);
+            Project project = teamDao.findProjectById(projectId);
+            if (project == null || !workspaceId.equals(project.getWorkspaceId())) {
+                throw new IllegalStateException("Dự án không tồn tại");
+            }
+            return teamDao.findMilestones(projectId);
+        }, callback);
+    }
+
+    public void addMilestone(
+            String projectId, String workspaceId, String actorId,
+            String title, long dueDate,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            WorkspaceMember actor = requireActiveMember(workspaceId, actorId);
+            if (!TeamRules.canManageProjects(actor.getRole())) {
+                throw new SecurityException("Bạn không có quyền thêm mốc dự án");
+            }
+            Project project = teamDao.findProjectById(projectId);
+            if (project == null) throw new IllegalStateException("Dự án không tồn tại");
+            ProjectMilestone item = new ProjectMilestone();
+            item.setMilestoneId(UUID.randomUUID().toString());
+            item.setProjectId(projectId);
+            item.setWorkspaceId(workspaceId);
+            item.setTitle(requireText(title, "Tên mốc không được để trống"));
+            item.setDueDate(dueDate);
+            item.setCreatedBy(actorId);
+            item.setCreatedAt(System.currentTimeMillis());
+            teamDao.saveMilestone(item);
+            cloudSync.upsertMilestone(item);
+            return true;
+        }, callback);
+    }
+
+    public void toggleMilestone(
+            ProjectMilestone item, String actorId, boolean completed,
+            RepositoryCallback<Boolean> callback
+    ) {
+        execute(() -> {
+            WorkspaceMember actor = requireActiveMember(item.getWorkspaceId(), actorId);
+            if (!TeamRules.canManageProjects(actor.getRole())) {
+                throw new SecurityException("Bạn không có quyền cập nhật mốc dự án");
+            }
+            item.setCompletedAt(completed ? System.currentTimeMillis() : 0);
+            teamDao.saveMilestone(item);
+            cloudSync.upsertMilestone(item);
+            return true;
+        }, callback);
+    }
+
     public void saveTeamTask(
             Task task,
-            String assigneeId,
+            List<String> assigneeIds,
             String actorId,
             RepositoryCallback<Task> callback
     ) {
@@ -419,7 +733,13 @@ public class TeamRepository {
             }
             Workspace workspace = requireTeam(task.getWorkspaceId());
             WorkspaceMember actor = requireActiveMember(workspace.getWorkspaceId(), actorId);
-            WorkspaceMember assignee = requireActiveMember(workspace.getWorkspaceId(), assigneeId);
+            if (assigneeIds == null || assigneeIds.isEmpty()) {
+                throw new IllegalArgumentException("Hãy chọn ít nhất một người thực hiện");
+            }
+            List<WorkspaceMember> assignees = new ArrayList<>();
+            for (String assigneeId : new LinkedHashSet<>(assigneeIds)) {
+                assignees.add(requireActiveMember(workspace.getWorkspaceId(), assigneeId));
+            }
             Project project = teamDao.findProjectById(task.getProjectId());
             if (project == null || !workspace.getWorkspaceId().equals(project.getWorkspaceId()) ||
                     !ProjectStatus.ACTIVE.equals(project.getStatus())) {
@@ -440,13 +760,13 @@ public class TeamRepository {
                         actor.getRole(),
                         actorId,
                         existingItem.getTask(),
-                        existingItem.getAssigneeId()
+                        existingItem.getAssigneeIds()
                 )) {
                     throw new SecurityException("Bạn không có quyền sửa công việc này");
                 }
                 task.setCreatedBy(existingItem.getTask().getCreatedBy());
                 task.setCreatedAt(existingItem.getTask().getCreatedAt());
-                task.setStartDate(existingItem.getTask().getStartDate());
+                task.setVersion(Math.max(1, existingItem.getTask().getVersion() + 1));
             } else {
                 if (!TeamRules.canCreateTask(actor.getRole())) {
                     throw new SecurityException("Bạn không có quyền tạo công việc");
@@ -454,7 +774,8 @@ public class TeamRepository {
                 task.setTaskId(UUID.randomUUID().toString());
                 task.setCreatedBy(actorId);
                 task.setCreatedAt(now);
-                task.setStartDate(now);
+                if (task.getStartDate() <= 0) task.setStartDate(now);
+                task.setVersion(1);
             }
 
             prepareTask(task, now);
@@ -466,19 +787,33 @@ public class TeamRepository {
                     throw new IllegalStateException("Không thể lưu công việc nhóm");
                 }
                 teamDao.clearTaskAssignees(task.getTaskId());
-                if (!teamDao.insertTaskAssignee(
-                        task.getTaskId(),
-                        assignee.getUserId(),
-                        actorId,
-                        now
-                )) {
-                    throw new IllegalStateException("Không thể giao công việc");
+                for (WorkspaceMember assignee : assignees) {
+                    if (!teamDao.insertTaskAssignee(
+                            task.getTaskId(),
+                            assignee.getUserId(),
+                            actorId,
+                            now
+                    )) {
+                        throw new IllegalStateException("Không thể giao công việc");
+                    }
                 }
                 database.setTransactionSuccessful();
             } finally {
                 database.endTransaction();
             }
-            cloudSync.upsertTask(task, assignee.getUserId());
+            cloudSync.upsertTask(task, assignees.get(0).getUserId());
+            TaskHistory history = historyDao.add(task.getTaskId(), actorId,
+                    editing ? TaskHistoryAction.UPDATED : TaskHistoryAction.CREATED,
+                    editing ? "Đã cập nhật công việc nhóm" : "Đã tạo và giao công việc nhóm");
+            cloudSync.upsertTaskHistory(history);
+            reminderScheduler.schedule(task);
+            for (WorkspaceMember assignee : assignees) {
+                if (!actorId.equals(assignee.getUserId())) {
+                    notificationDao.add(assignee.getUserId(), task.getWorkspaceId(),
+                            task.getTaskId(), "TASK_ASSIGNED", "Công việc mới được giao",
+                            "Bạn được giao: " + task.getTitle());
+                }
+            }
             return task;
         }, callback);
     }
@@ -499,10 +834,20 @@ public class TeamRepository {
             if (!TeamRules.canDeleteTask(actor.getRole(), actorId, item.getTask())) {
                 throw new SecurityException("Bạn không có quyền xóa công việc này");
             }
-            if (taskDao.delete(taskId) <= 0) {
+            long now = System.currentTimeMillis();
+            Task task = item.getTask();
+            task.setDeletedAt(now);
+            task.setUpdatedAt(now);
+            task.setVersion(Math.max(1, task.getVersion() + 1));
+            task.setSyncStatus(SyncStatus.PENDING);
+            if (taskDao.softDelete(taskId, now, task.getVersion()) <= 0) {
                 throw new IllegalStateException("Không thể xóa công việc");
             }
-            cloudSync.deleteTask(taskId);
+            cloudSync.upsertTask(task, item.getAssigneeId());
+            TaskHistory history = historyDao.add(taskId, actorId,
+                    TaskHistoryAction.DELETED, "Đã đưa công việc nhóm vào thùng rác");
+            cloudSync.upsertTaskHistory(history);
+            reminderScheduler.cancel(taskId);
             return true;
         }, callback);
     }
@@ -521,7 +866,15 @@ public class TeamRepository {
         if (task.getEstimatedMinutes() < 0) {
             throw new IllegalArgumentException("Thời gian dự kiến không hợp lệ");
         }
+        if (!TeamFeatureRules.isValidSchedule(task.getStartDate(), task.getDueDate())) {
+            throw new IllegalArgumentException("Hạn hoàn thành phải sau thời gian bắt đầu");
+        }
         task.setProgress(TaskRules.normalizeProgress(task.getStatus(), task.getProgress()));
+        task.setCompletedAt(com.vandieu_manhdung.taskmanager.core.constant.TaskStatus.COMPLETED
+                .equals(task.getStatus()) ? (task.getCompletedAt() > 0 ? task.getCompletedAt() : now) : 0);
+        task.setDeletedAt(0);
+        task.setVersion(Math.max(1, task.getVersion()));
+        task.setSyncStatus(SyncStatus.PENDING);
         task.setUpdatedAt(now);
     }
 
@@ -562,6 +915,10 @@ public class TeamRepository {
 
     private String cleanText(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private <T> void execute(

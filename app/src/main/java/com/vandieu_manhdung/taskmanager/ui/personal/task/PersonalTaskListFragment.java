@@ -185,7 +185,7 @@ public class PersonalTaskListFragment extends Fragment {
         );
 
         recyclerTasks.setAdapter(adapter);
-        recyclerTasks.setHasFixedSize(true);
+        recyclerTasks.setHasFixedSize(false);
     }
 
     private void setupViewModel() {

@@ -8,7 +8,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.TaskRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.TaskRepository;
 import com.vandieu_manhdung.taskmanager.core.util.TaskScheduleRules;
 import com.vandieu_manhdung.taskmanager.model.Task;
 

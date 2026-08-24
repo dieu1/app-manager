@@ -9,6 +9,9 @@ import android.os.Build;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
 import com.vandieu_manhdung.taskmanager.core.util.TaskScheduleRules;
 import com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.NotificationDao;
+import com.vandieu_manhdung.taskmanager.data.local.dao.TeamDao;
+import com.google.firebase.auth.FirebaseAuth;
 import com.vandieu_manhdung.taskmanager.model.Task;
 
 public class TaskReminderScheduler {
@@ -27,6 +30,12 @@ public class TaskReminderScheduler {
             return;
         }
         cancel(task.getTaskId());
+        if (task.getProjectId() != null && !task.getProjectId().isBlank()) {
+            String currentUserId = FirebaseAuth.getInstance().getCurrentUser() == null
+                    ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
+            if (currentUserId == null || !new TeamDao(context)
+                    .findTaskAssigneeIds(task.getTaskId()).contains(currentUserId)) return;
+        }
         if (TaskStatus.COMPLETED.equals(task.getStatus()) ||
                 TaskStatus.CANCELLED.equals(task.getStatus())) {
             return;
@@ -35,9 +44,17 @@ public class TaskReminderScheduler {
         if (task.getStartDate() > now) {
             scheduleOne(task, TaskReminderReceiver.TYPE_START, task.getStartDate());
         }
-        long dueSoonAt = TaskScheduleRules.dueSoonAt(task.getDueDate());
-        if (dueSoonAt > now) {
+        long dueSoonAt = TaskScheduleRules.nextDueSoonAt(task.getDueDate(), now);
+        if (dueSoonAt > 0) {
             scheduleOne(task, TaskReminderReceiver.TYPE_DUE_SOON, dueSoonAt);
+        }
+        if (task.getDueDate() > 0) {
+            NotificationDao notificationDao = new NotificationDao(context);
+            if (!notificationDao.existsForTaskTypeSince(
+                    task.getTaskId(), TaskReminderReceiver.TYPE_OVERDUE, task.getDueDate())) {
+                scheduleOne(task, TaskReminderReceiver.TYPE_OVERDUE,
+                        Math.max(now + 1_000L, task.getDueDate() + 60_000L));
+            }
         }
     }
 
@@ -47,10 +64,11 @@ public class TaskReminderScheduler {
         }
         alarmManager.cancel(pendingIntent(taskId, "", TaskReminderReceiver.TYPE_START));
         alarmManager.cancel(pendingIntent(taskId, "", TaskReminderReceiver.TYPE_DUE_SOON));
+        alarmManager.cancel(pendingIntent(taskId, "", TaskReminderReceiver.TYPE_OVERDUE));
     }
 
     public void rescheduleAll() {
-        for (Task task : new TaskDao(context).findAllScheduledTasks(System.currentTimeMillis())) {
+        for (Task task : new TaskDao(context).findAllReminderTasks()) {
             schedule(task);
         }
     }

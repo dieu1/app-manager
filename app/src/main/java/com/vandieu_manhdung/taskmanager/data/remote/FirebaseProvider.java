@@ -5,6 +5,7 @@ import android.content.Context;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.storage.FirebaseStorage;
 
 public final class FirebaseProvider {
 
@@ -26,6 +27,11 @@ public final class FirebaseProvider {
     public static FirebaseFirestore firestore(Context context) {
         requireConfigured(context);
         return FirebaseFirestore.getInstance();
+    }
+
+    public static FirebaseStorage storage(Context context) {
+        requireConfigured(context);
+        return FirebaseStorage.getInstance();
     }
 
     private static void requireConfigured(Context context) {

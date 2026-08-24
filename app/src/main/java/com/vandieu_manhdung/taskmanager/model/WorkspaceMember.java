@@ -8,6 +8,7 @@ public class WorkspaceMember {
     private String role;
     private String status;
     private long joinedAt;
+    private String inviteId;
     private String displayName;
     private String email;
     private int totalTasks;
@@ -60,6 +61,9 @@ public class WorkspaceMember {
     public void setJoinedAt(long joinedAt) {
         this.joinedAt = joinedAt;
     }
+
+    public String getInviteId() { return inviteId; }
+    public void setInviteId(String inviteId) { this.inviteId = inviteId; }
 
     public String getDisplayName() {
         return displayName;

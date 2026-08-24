@@ -8,7 +8,8 @@
     <EditText
         android:id="@+id/editProjectName"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="54dp"
+        android:background="@drawable/bg_team_input"
         android:hint="@string/project_name"
         android:importantForAutofill="no"
         android:inputType="textCapSentences"
@@ -18,11 +19,60 @@
         android:id="@+id/editProjectDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_team_input"
         android:gravity="top"
         android:hint="@string/project_description"
         android:importantForAutofill="no"
         android:inputType="textCapSentences|textMultiLine"
         android:maxLength="500"
-        android:minLines="2" />
+        android:minLines="2"
+        android:padding="14dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:textColor="@color/team_text_primary"
+        android:text="@string/project_manager"
+        android:textStyle="bold" />
+
+    <Spinner
+        android:id="@+id/spinnerProjectManager"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/bg_team_input" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonProjectStart"
+        style="@style/Widget.TaskManager.Team.Button.Tonal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/select_project_start" />
+
+    <TextView
+        android:id="@+id/textProjectStart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/bg_team_input"
+        android:padding="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonProjectDue"
+        style="@style/Widget.TaskManager.Team.Button.Tonal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/select_project_due" />
+
+    <TextView
+        android:id="@+id/textProjectDue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/bg_team_input"
+        android:padding="12dp" />
 </LinearLayout>

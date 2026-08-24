@@ -1,11 +1,15 @@
 package com.vandieu_manhdung.taskmanager.model;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class TeamTaskItem {
 
     private final Task task;
     private final String projectName;
-    private final String assigneeId;
-    private final String assigneeName;
+    private final List<String> assigneeIds;
+    private final List<String> assigneeNames;
 
     public TeamTaskItem(
             Task task,
@@ -13,10 +17,21 @@ public class TeamTaskItem {
             String assigneeId,
             String assigneeName
     ) {
+        this(task, projectName,
+                assigneeId == null ? List.of() : List.of(assigneeId),
+                assigneeName == null ? List.of() : List.of(assigneeName));
+    }
+
+    public TeamTaskItem(
+            Task task,
+            String projectName,
+            List<String> assigneeIds,
+            List<String> assigneeNames
+    ) {
         this.task = task;
         this.projectName = projectName;
-        this.assigneeId = assigneeId;
-        this.assigneeName = assigneeName;
+        this.assigneeIds = Collections.unmodifiableList(new ArrayList<>(assigneeIds));
+        this.assigneeNames = Collections.unmodifiableList(new ArrayList<>(assigneeNames));
     }
 
     public Task getTask() {
@@ -28,10 +43,18 @@ public class TeamTaskItem {
     }
 
     public String getAssigneeId() {
-        return assigneeId;
+        return assigneeIds.isEmpty() ? null : assigneeIds.get(0);
     }
 
     public String getAssigneeName() {
-        return assigneeName;
+        return assigneeNames.isEmpty() ? null : String.join(", ", assigneeNames);
+    }
+
+    public List<String> getAssigneeIds() {
+        return assigneeIds;
+    }
+
+    public List<String> getAssigneeNames() {
+        return assigneeNames;
     }
 }

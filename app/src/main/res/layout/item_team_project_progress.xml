@@ -1,34 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.TaskManager.Team.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="4dp">
+    android:layout_marginVertical="5dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="16dp">
 
         <TextView
             android:id="@+id/textDashboardProjectName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+            android:textColor="@color/team_text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            tools:text="Ứng dụng Android" />
 
         <TextView
             android:id="@+id/textDashboardProjectSummary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp" />
+            android:layout_marginTop="5dp"
+            android:textAppearance="@style/TextAppearance.TaskManager.Team.Body"
+            tools:text="Hoàn thành 7/10 · Quá hạn 1 · 70%" />
 
         <ProgressBar
             android:id="@+id/progressDashboardProject"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="100" />
+            android:layout_height="7dp"
+            android:layout_marginTop="10dp"
+            android:max="100"
+            android:progressBackgroundTint="@color/team_surface_alt"
+            android:progressTint="@color/team_secondary"
+            tools:progress="70" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

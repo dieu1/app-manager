@@ -5,11 +5,16 @@ public class TeamInvite {
     private String inviteId;
     private String workspaceId;
     private String email;
+    private String invitedUserId;
+    private String invitedUserCode;
+    private String invitedDisplayName;
+    private String workspaceName;
     private String role;
     private String status;
     private String invitedBy;
     private long createdAt;
     private long respondedAt;
+    private long expiresAt;
 
     public String getInviteId() {
         return inviteId;
@@ -34,6 +39,15 @@ public class TeamInvite {
     public void setEmail(String email) {
         this.email = email;
     }
+
+    public String getInvitedUserId() { return invitedUserId; }
+    public void setInvitedUserId(String invitedUserId) { this.invitedUserId = invitedUserId; }
+    public String getInvitedUserCode() { return invitedUserCode; }
+    public void setInvitedUserCode(String invitedUserCode) { this.invitedUserCode = invitedUserCode; }
+    public String getInvitedDisplayName() { return invitedDisplayName; }
+    public void setInvitedDisplayName(String invitedDisplayName) { this.invitedDisplayName = invitedDisplayName; }
+    public String getWorkspaceName() { return workspaceName; }
+    public void setWorkspaceName(String workspaceName) { this.workspaceName = workspaceName; }
 
     public String getRole() {
         return role;
@@ -74,4 +88,7 @@ public class TeamInvite {
     public void setRespondedAt(long respondedAt) {
         this.respondedAt = respondedAt;
     }
+
+    public long getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(long expiresAt) { this.expiresAt = expiresAt; }
 }

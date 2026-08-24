@@ -18,7 +18,15 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        // Firebase project hiện dùng gói Spark. Giữ các tính năng cần Cloud
+        // Storage ở trạng thái tắt để người dùng không đi vào luồng chắc chắn lỗi.
+        buildConfigField("boolean", "CLOUD_STORAGE_ENABLED", "false")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -39,6 +47,9 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.storage)
+    implementation(libs.firebase.messaging)
+    implementation(libs.work.runtime)
     implementation(libs.recyclerview)
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.lifecycle.livedata)

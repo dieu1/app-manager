@@ -8,7 +8,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.AuthRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.AuthRepository;
 import com.vandieu_manhdung.taskmanager.model.User;
 
 public class AuthViewModel extends AndroidViewModel {

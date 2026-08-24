@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import com.vandieu_manhdung.taskmanager.R;
+import com.vandieu_manhdung.taskmanager.data.local.dao.NotificationDao;
 import com.vandieu_manhdung.taskmanager.model.Task;
 import com.vandieu_manhdung.taskmanager.model.TaskSubtask;
 import com.vandieu_manhdung.taskmanager.ui.main.MainActivity;
@@ -47,6 +48,35 @@ public final class TaskNotificationManager {
             String title,
             String message
     ) {
+        showTaskReminder(context, notificationId, null, "general", title, message);
+    }
+
+    public static void showTaskReminder(
+            Context context,
+            int notificationId,
+            String taskId,
+            String type,
+            String title,
+            String message
+    ) {
+        if (taskId != null && !taskId.isBlank()) {
+            Task task = new com.vandieu_manhdung.taskmanager.data.local.dao.TaskDao(context)
+                    .findByIdIncludingDeleted(taskId);
+            if (task != null) {
+                String notificationUserId = task.getCreatedBy();
+                if (task.getProjectId() != null && !task.getProjectId().isBlank()) {
+                    com.google.firebase.auth.FirebaseUser currentUser =
+                            com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+                    if (currentUser != null &&
+                            new com.vandieu_manhdung.taskmanager.data.local.dao.TeamDao(context)
+                                    .findTaskAssigneeIds(taskId).contains(currentUser.getUid())) {
+                        notificationUserId = currentUser.getUid();
+                    }
+                }
+                new NotificationDao(context).add(
+                        notificationUserId, task.getWorkspaceId(), taskId, type, title, message);
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
@@ -54,6 +84,7 @@ public final class TaskNotificationManager {
         }
         createChannel(context);
         Intent openApp = new Intent(context, MainActivity.class)
+                .putExtra(MainActivity.EXTRA_OPEN_TASK_ID, taskId)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent contentIntent = PendingIntent.getActivity(
                 context,
@@ -88,6 +119,8 @@ public final class TaskNotificationManager {
         showTaskReminder(
                 context,
                 positiveId("subtask:" + subtask.getSubtaskId()),
+                task.getTaskId(),
+                "subtask_completed",
                 context.getString(R.string.notification_subtask_completed_title, task.getTitle()),
                 message
         );

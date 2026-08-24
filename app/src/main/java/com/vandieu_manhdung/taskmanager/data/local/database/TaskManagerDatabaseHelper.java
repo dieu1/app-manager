@@ -13,7 +13,7 @@ import static com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContr
 public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "task_manager.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 7;
 
     private static volatile TaskManagerDatabaseHelper instance;
 
@@ -69,6 +69,11 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     " INTEGER NOT NULL DEFAULT 0 CHECK (" +
                     TaskTable.ESTIMATED_MINUTES + " >= 0), " +
 
+                    TaskTable.COMPLETED_AT + " INTEGER, " +
+                    TaskTable.DELETED_AT + " INTEGER, " +
+                    TaskTable.VERSION + " INTEGER NOT NULL DEFAULT 1, " +
+                    TaskTable.SYNC_STATUS + " TEXT NOT NULL DEFAULT 'SYNCED', " +
+
                     TaskTable.CREATED_AT + " INTEGER NOT NULL, " +
                     TaskTable.UPDATED_AT + " INTEGER, " +
 
@@ -82,38 +87,22 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
                     ")";
 
-    private static final String CREATE_WORK_SESSIONS_TABLE =
-            "CREATE TABLE " + WorkSessionTable.TABLE_NAME + " (" +
-                    WorkSessionTable.SESSION_ID + " TEXT PRIMARY KEY, " +
-                    WorkSessionTable.TASK_ID + " TEXT NOT NULL, " +
-                    WorkSessionTable.USER_ID + " TEXT NOT NULL, " +
-                    WorkSessionTable.START_TIME + " INTEGER NOT NULL, " +
-                    WorkSessionTable.END_TIME + " INTEGER, " +
-
-                    WorkSessionTable.DURATION_MINUTES +
-                    " INTEGER NOT NULL DEFAULT 0 CHECK (" +
-                    WorkSessionTable.DURATION_MINUTES + " >= 0), " +
-
-                    "FOREIGN KEY (" + WorkSessionTable.TASK_ID + ") " +
-                    "REFERENCES " + TaskTable.TABLE_NAME +
-                    "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE, " +
-
-                    "FOREIGN KEY (" + WorkSessionTable.USER_ID + ") " +
-                    "REFERENCES " + UserTable.TABLE_NAME +
-                    "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
-                    ")";
-
     private static final String CREATE_TASK_SUBTASKS_TABLE =
             "CREATE TABLE " + TaskSubtaskTable.TABLE_NAME + " (" +
                     TaskSubtaskTable.SUBTASK_ID + " TEXT PRIMARY KEY, " +
                     TaskSubtaskTable.TASK_ID + " TEXT NOT NULL, " +
                     TaskSubtaskTable.WORKSPACE_ID + " TEXT NOT NULL, " +
                     TaskSubtaskTable.CREATED_BY + " TEXT NOT NULL, " +
+                    TaskSubtaskTable.ASSIGNEE_ID + " TEXT, " +
                     TaskSubtaskTable.TITLE + " TEXT NOT NULL, " +
                     TaskSubtaskTable.ESTIMATED_MINUTES +
                     " INTEGER NOT NULL DEFAULT 0 CHECK (" +
                     TaskSubtaskTable.ESTIMATED_MINUTES + " >= 0), " +
                     TaskSubtaskTable.COMPLETED + " INTEGER NOT NULL DEFAULT 0, " +
+                    TaskSubtaskTable.COMPLETED_AT + " INTEGER, " +
+                    TaskSubtaskTable.DELETED_AT + " INTEGER, " +
+                    TaskSubtaskTable.VERSION + " INTEGER NOT NULL DEFAULT 1, " +
+                    TaskSubtaskTable.SYNC_STATUS + " TEXT NOT NULL DEFAULT 'SYNCED', " +
                     TaskSubtaskTable.SORT_ORDER + " INTEGER NOT NULL DEFAULT 0, " +
                     TaskSubtaskTable.CREATED_AT + " INTEGER NOT NULL, " +
                     TaskSubtaskTable.UPDATED_AT + " INTEGER, " +
@@ -128,6 +117,50 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
                     ")";
 
+    private static final String CREATE_TASK_HISTORIES_TABLE =
+            "CREATE TABLE " + TaskHistoryTable.TABLE_NAME + " (" +
+                    TaskHistoryTable.HISTORY_ID + " TEXT PRIMARY KEY, " +
+                    TaskHistoryTable.TASK_ID + " TEXT NOT NULL, " +
+                    TaskHistoryTable.USER_ID + " TEXT NOT NULL, " +
+                    TaskHistoryTable.ACTION + " TEXT NOT NULL, " +
+                    TaskHistoryTable.DETAIL + " TEXT, " +
+                    TaskHistoryTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    "FOREIGN KEY (" + TaskHistoryTable.TASK_ID + ") REFERENCES " +
+                    TaskTable.TABLE_NAME + "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE, " +
+                    "FOREIGN KEY (" + TaskHistoryTable.USER_ID + ") REFERENCES " +
+                    UserTable.TABLE_NAME + "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
+                    ")";
+
+    private static final String CREATE_NOTIFICATIONS_TABLE =
+            "CREATE TABLE " + NotificationTable.TABLE_NAME + " (" +
+                    NotificationTable.NOTIFICATION_ID + " TEXT PRIMARY KEY, " +
+                    NotificationTable.USER_ID + " TEXT NOT NULL, " +
+                    NotificationTable.TASK_ID + " TEXT, " +
+                    NotificationTable.WORKSPACE_ID + " TEXT, " +
+                    NotificationTable.TYPE + " TEXT NOT NULL, " +
+                    NotificationTable.TITLE + " TEXT NOT NULL, " +
+                    NotificationTable.MESSAGE + " TEXT NOT NULL, " +
+                    NotificationTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    NotificationTable.READ_AT + " INTEGER, " +
+                    "FOREIGN KEY (" + NotificationTable.USER_ID + ") REFERENCES " +
+                    UserTable.TABLE_NAME + "(" + UserTable.USER_ID + ") ON DELETE CASCADE, " +
+                    "FOREIGN KEY (" + NotificationTable.TASK_ID + ") REFERENCES " +
+                    TaskTable.TABLE_NAME + "(" + TaskTable.TASK_ID + ") ON DELETE SET NULL" +
+                    ")";
+
+    private static final String CREATE_SYNC_QUEUE_TABLE =
+            "CREATE TABLE " + SyncQueueTable.TABLE_NAME + " (" +
+                    SyncQueueTable.QUEUE_ID + " TEXT PRIMARY KEY, " +
+                    SyncQueueTable.ENTITY_TYPE + " TEXT NOT NULL, " +
+                    SyncQueueTable.ENTITY_ID + " TEXT NOT NULL, " +
+                    SyncQueueTable.OPERATION + " TEXT NOT NULL, " +
+                    SyncQueueTable.VERSION + " INTEGER NOT NULL DEFAULT 1, " +
+                    SyncQueueTable.ATTEMPT_COUNT + " INTEGER NOT NULL DEFAULT 0, " +
+                    SyncQueueTable.LAST_ERROR + " TEXT, " +
+                    SyncQueueTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    SyncQueueTable.UPDATED_AT + " INTEGER NOT NULL" +
+                    ")";
+
     private static final String CREATE_WORKSPACE_MEMBERS_TABLE =
             "CREATE TABLE " + WorkspaceMemberTable.TABLE_NAME + " (" +
                     WorkspaceMemberTable.WORKSPACE_ID + " TEXT NOT NULL, " +
@@ -136,6 +169,7 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     WorkspaceMemberTable.STATUS +
                     " TEXT NOT NULL DEFAULT 'ACTIVE', " +
                     WorkspaceMemberTable.JOINED_AT + " INTEGER NOT NULL, " +
+                    WorkspaceMemberTable.INVITE_ID + " TEXT, " +
                     "PRIMARY KEY (" + WorkspaceMemberTable.WORKSPACE_ID +
                     ", " + WorkspaceMemberTable.USER_ID + "), " +
                     "FOREIGN KEY (" + WorkspaceMemberTable.WORKSPACE_ID + ") " +
@@ -151,17 +185,16 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     TeamInviteTable.INVITE_ID + " TEXT PRIMARY KEY, " +
                     TeamInviteTable.WORKSPACE_ID + " TEXT NOT NULL, " +
                     TeamInviteTable.EMAIL + " TEXT NOT NULL, " +
+                    TeamInviteTable.INVITED_USER_ID + " TEXT NOT NULL, " +
+                    TeamInviteTable.INVITED_USER_CODE + " TEXT NOT NULL, " +
+                    TeamInviteTable.INVITED_DISPLAY_NAME + " TEXT, " +
+                    TeamInviteTable.WORKSPACE_NAME + " TEXT NOT NULL, " +
                     TeamInviteTable.ROLE + " TEXT NOT NULL, " +
                     TeamInviteTable.STATUS + " TEXT NOT NULL, " +
                     TeamInviteTable.INVITED_BY + " TEXT NOT NULL, " +
                     TeamInviteTable.CREATED_AT + " INTEGER NOT NULL, " +
                     TeamInviteTable.RESPONDED_AT + " INTEGER, " +
-                    "FOREIGN KEY (" + TeamInviteTable.WORKSPACE_ID + ") " +
-                    "REFERENCES " + WorkspaceTable.TABLE_NAME +
-                    "(" + WorkspaceTable.WORKSPACE_ID + ") ON DELETE CASCADE, " +
-                    "FOREIGN KEY (" + TeamInviteTable.INVITED_BY + ") " +
-                    "REFERENCES " + UserTable.TABLE_NAME +
-                    "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
+                    TeamInviteTable.EXPIRES_AT + " INTEGER NOT NULL" +
                     ")";
 
     private static final String CREATE_PROJECTS_TABLE =
@@ -172,6 +205,13 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     ProjectTable.DESCRIPTION + " TEXT, " +
                     ProjectTable.STATUS + " TEXT NOT NULL DEFAULT 'ACTIVE', " +
                     ProjectTable.CREATED_BY + " TEXT NOT NULL, " +
+                    ProjectTable.MANAGER_ID + " TEXT, " +
+                    ProjectTable.START_DATE + " INTEGER, " +
+                    ProjectTable.DUE_DATE + " INTEGER, " +
+                    ProjectTable.COMPLETED_AT + " INTEGER, " +
+                    ProjectTable.DELETED_AT + " INTEGER, " +
+                    ProjectTable.VERSION + " INTEGER NOT NULL DEFAULT 1, " +
+                    ProjectTable.SYNC_STATUS + " TEXT NOT NULL DEFAULT 'SYNCED', " +
                     ProjectTable.CREATED_AT + " INTEGER NOT NULL, " +
                     ProjectTable.UPDATED_AT + " INTEGER, " +
                     "FOREIGN KEY (" + ProjectTable.WORKSPACE_ID + ") " +
@@ -200,6 +240,61 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                     "REFERENCES " + UserTable.TABLE_NAME +
                     "(" + UserTable.USER_ID + ") ON DELETE CASCADE" +
                     ")";
+
+    private static final String CREATE_TASK_COMMENTS_TABLE =
+            "CREATE TABLE " + TaskCommentTable.TABLE_NAME + " (" +
+                    TaskCommentTable.COMMENT_ID + " TEXT PRIMARY KEY, " +
+                    TaskCommentTable.TASK_ID + " TEXT NOT NULL, " +
+                    TaskCommentTable.WORKSPACE_ID + " TEXT NOT NULL, " +
+                    TaskCommentTable.USER_ID + " TEXT NOT NULL, " +
+                    TaskCommentTable.MESSAGE + " TEXT NOT NULL, " +
+                    TaskCommentTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    TaskCommentTable.UPDATED_AT + " INTEGER NOT NULL, " +
+                    TaskCommentTable.DELETED_AT + " INTEGER, " +
+                    "FOREIGN KEY (" + TaskCommentTable.TASK_ID + ") REFERENCES " +
+                    TaskTable.TABLE_NAME + "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE)";
+
+    private static final String CREATE_TASK_ATTACHMENTS_TABLE =
+            "CREATE TABLE " + TaskAttachmentTable.TABLE_NAME + " (" +
+                    TaskAttachmentTable.ATTACHMENT_ID + " TEXT PRIMARY KEY, " +
+                    TaskAttachmentTable.TASK_ID + " TEXT NOT NULL, " +
+                    TaskAttachmentTable.WORKSPACE_ID + " TEXT NOT NULL, " +
+                    TaskAttachmentTable.USER_ID + " TEXT NOT NULL, " +
+                    TaskAttachmentTable.DISPLAY_NAME + " TEXT NOT NULL, " +
+                    TaskAttachmentTable.MIME_TYPE + " TEXT, " +
+                    TaskAttachmentTable.LOCAL_URI + " TEXT, " +
+                    TaskAttachmentTable.REMOTE_URL + " TEXT, " +
+                    TaskAttachmentTable.SIZE_BYTES + " INTEGER NOT NULL DEFAULT 0, " +
+                    TaskAttachmentTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    TaskAttachmentTable.DELETED_AT + " INTEGER, " +
+                    "FOREIGN KEY (" + TaskAttachmentTable.TASK_ID + ") REFERENCES " +
+                    TaskTable.TABLE_NAME + "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE)";
+
+    private static final String CREATE_TASK_DEPENDENCIES_TABLE =
+            "CREATE TABLE " + TaskDependencyTable.TABLE_NAME + " (" +
+                    TaskDependencyTable.TASK_ID + " TEXT NOT NULL, " +
+                    TaskDependencyTable.DEPENDS_ON_TASK_ID + " TEXT NOT NULL, " +
+                    TaskDependencyTable.CREATED_BY + " TEXT NOT NULL, " +
+                    TaskDependencyTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    "PRIMARY KEY (" + TaskDependencyTable.TASK_ID + ", " +
+                    TaskDependencyTable.DEPENDS_ON_TASK_ID + "), " +
+                    "FOREIGN KEY (" + TaskDependencyTable.TASK_ID + ") REFERENCES " +
+                    TaskTable.TABLE_NAME + "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE, " +
+                    "FOREIGN KEY (" + TaskDependencyTable.DEPENDS_ON_TASK_ID + ") REFERENCES " +
+                    TaskTable.TABLE_NAME + "(" + TaskTable.TASK_ID + ") ON DELETE CASCADE)";
+
+    private static final String CREATE_PROJECT_MILESTONES_TABLE =
+            "CREATE TABLE " + ProjectMilestoneTable.TABLE_NAME + " (" +
+                    ProjectMilestoneTable.MILESTONE_ID + " TEXT PRIMARY KEY, " +
+                    ProjectMilestoneTable.PROJECT_ID + " TEXT NOT NULL, " +
+                    ProjectMilestoneTable.WORKSPACE_ID + " TEXT NOT NULL, " +
+                    ProjectMilestoneTable.TITLE + " TEXT NOT NULL, " +
+                    ProjectMilestoneTable.DUE_DATE + " INTEGER, " +
+                    ProjectMilestoneTable.COMPLETED_AT + " INTEGER, " +
+                    ProjectMilestoneTable.CREATED_BY + " TEXT NOT NULL, " +
+                    ProjectMilestoneTable.CREATED_AT + " INTEGER NOT NULL, " +
+                    "FOREIGN KEY (" + ProjectMilestoneTable.PROJECT_ID + ") REFERENCES " +
+                    ProjectTable.TABLE_NAME + "(" + ProjectTable.PROJECT_ID + ") ON DELETE CASCADE)";
 
     private TaskManagerDatabaseHelper(
             @Nullable Context context
@@ -236,10 +331,16 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
         database.execSQL(CREATE_PROJECTS_TABLE);
         database.execSQL(CREATE_TASKS_TABLE);
         database.execSQL(CREATE_TASK_SUBTASKS_TABLE);
-        database.execSQL(CREATE_WORK_SESSIONS_TABLE);
+        database.execSQL(CREATE_TASK_HISTORIES_TABLE);
+        database.execSQL(CREATE_NOTIFICATIONS_TABLE);
+        database.execSQL(CREATE_SYNC_QUEUE_TABLE);
         database.execSQL(CREATE_WORKSPACE_MEMBERS_TABLE);
         database.execSQL(CREATE_TEAM_INVITES_TABLE);
         database.execSQL(CREATE_TASK_ASSIGNEES_TABLE);
+        database.execSQL(CREATE_TASK_COMMENTS_TABLE);
+        database.execSQL(CREATE_TASK_ATTACHMENTS_TABLE);
+        database.execSQL(CREATE_TASK_DEPENDENCIES_TABLE);
+        database.execSQL(CREATE_PROJECT_MILESTONES_TABLE);
 
         createIndexes(database);
     }
@@ -285,9 +386,29 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
         );
 
         database.execSQL(
-                "CREATE INDEX IF NOT EXISTS index_session_task " +
-                        "ON " + WorkSessionTable.TABLE_NAME +
-                        "(" + WorkSessionTable.TASK_ID + ")"
+                "CREATE INDEX IF NOT EXISTS index_task_deleted " +
+                        "ON " + TaskTable.TABLE_NAME +
+                        "(" + TaskTable.WORKSPACE_ID + ", " + TaskTable.DELETED_AT + ")"
+        );
+
+        database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_history_task " +
+                        "ON " + TaskHistoryTable.TABLE_NAME +
+                        "(" + TaskHistoryTable.TASK_ID + ", " +
+                        TaskHistoryTable.CREATED_AT + " DESC)"
+        );
+
+        database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_notification_user " +
+                        "ON " + NotificationTable.TABLE_NAME +
+                        "(" + NotificationTable.USER_ID + ", " +
+                        NotificationTable.READ_AT + ", " + NotificationTable.CREATED_AT + " DESC)"
+        );
+
+        database.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_sync_entity " +
+                        "ON " + SyncQueueTable.TABLE_NAME +
+                        "(" + SyncQueueTable.ENTITY_TYPE + ", " + SyncQueueTable.ENTITY_ID + ")"
         );
 
         database.execSQL(
@@ -301,15 +422,6 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
                 "CREATE INDEX IF NOT EXISTS index_subtask_workspace " +
                         "ON " + TaskSubtaskTable.TABLE_NAME +
                         "(" + TaskSubtaskTable.WORKSPACE_ID + ")"
-        );
-
-        database.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS " +
-                        "index_one_active_session_per_user " +
-                        "ON " + WorkSessionTable.TABLE_NAME +
-                        "(" + WorkSessionTable.USER_ID + ") " +
-                        "WHERE " + WorkSessionTable.END_TIME +
-                        " IS NULL"
         );
 
         database.execSQL(
@@ -378,6 +490,92 @@ public class TaskManagerDatabaseHelper extends SQLiteOpenHelper {
         if (oldVersion < 4) {
             database.execSQL(CREATE_TASK_SUBTASKS_TABLE);
             createIndexes(database);
+        }
+        if (oldVersion < 5) {
+            database.execSQL("ALTER TABLE " + TaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskTable.COMPLETED_AT + " INTEGER");
+            database.execSQL("ALTER TABLE " + TaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskTable.DELETED_AT + " INTEGER");
+            database.execSQL("ALTER TABLE " + TaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskTable.VERSION + " INTEGER NOT NULL DEFAULT 1");
+            database.execSQL("ALTER TABLE " + TaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskTable.SYNC_STATUS + " TEXT NOT NULL DEFAULT 'SYNCED'");
+            database.execSQL("ALTER TABLE " + TaskSubtaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskSubtaskTable.COMPLETED_AT + " INTEGER");
+            database.execSQL("ALTER TABLE " + TaskSubtaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskSubtaskTable.DELETED_AT + " INTEGER");
+            database.execSQL("ALTER TABLE " + TaskSubtaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskSubtaskTable.VERSION + " INTEGER NOT NULL DEFAULT 1");
+            database.execSQL("ALTER TABLE " + TaskSubtaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskSubtaskTable.SYNC_STATUS + " TEXT NOT NULL DEFAULT 'SYNCED'");
+            database.execSQL(CREATE_TASK_HISTORIES_TABLE);
+            database.execSQL(CREATE_NOTIFICATIONS_TABLE);
+            database.execSQL(CREATE_SYNC_QUEUE_TABLE);
+            createIndexes(database);
+        }
+        if (oldVersion < 6) {
+            database.execSQL("ALTER TABLE " + TaskSubtaskTable.TABLE_NAME +
+                    " ADD COLUMN " + TaskSubtaskTable.ASSIGNEE_ID + " TEXT");
+            database.execSQL("ALTER TABLE " + NotificationTable.TABLE_NAME +
+                    " ADD COLUMN " + NotificationTable.WORKSPACE_ID + " TEXT");
+            database.execSQL("ALTER TABLE " + WorkspaceMemberTable.TABLE_NAME +
+                    " ADD COLUMN " + WorkspaceMemberTable.INVITE_ID + " TEXT");
+            database.execSQL("ALTER TABLE " + TeamInviteTable.TABLE_NAME +
+                    " ADD COLUMN " + TeamInviteTable.INVITED_USER_ID + " TEXT NOT NULL DEFAULT ''");
+            database.execSQL("ALTER TABLE " + TeamInviteTable.TABLE_NAME +
+                    " ADD COLUMN " + TeamInviteTable.INVITED_USER_CODE + " TEXT NOT NULL DEFAULT ''");
+            database.execSQL("ALTER TABLE " + TeamInviteTable.TABLE_NAME +
+                    " ADD COLUMN " + TeamInviteTable.INVITED_DISPLAY_NAME + " TEXT");
+            database.execSQL("ALTER TABLE " + TeamInviteTable.TABLE_NAME +
+                    " ADD COLUMN " + TeamInviteTable.WORKSPACE_NAME + " TEXT NOT NULL DEFAULT ''");
+            database.execSQL("ALTER TABLE " + TeamInviteTable.TABLE_NAME +
+                    " ADD COLUMN " + TeamInviteTable.EXPIRES_AT + " INTEGER NOT NULL DEFAULT 0");
+            database.execSQL("ALTER TABLE " + TeamInviteTable.TABLE_NAME +
+                    " RENAME TO team_invites_legacy");
+            database.execSQL(CREATE_TEAM_INVITES_TABLE);
+            database.execSQL("INSERT INTO " + TeamInviteTable.TABLE_NAME + " (" +
+                    TeamInviteTable.INVITE_ID + "," + TeamInviteTable.WORKSPACE_ID + "," +
+                    TeamInviteTable.EMAIL + "," + TeamInviteTable.INVITED_USER_ID + "," +
+                    TeamInviteTable.INVITED_USER_CODE + "," +
+                    TeamInviteTable.INVITED_DISPLAY_NAME + "," + TeamInviteTable.WORKSPACE_NAME + "," +
+                    TeamInviteTable.ROLE + "," + TeamInviteTable.STATUS + "," +
+                    TeamInviteTable.INVITED_BY + "," + TeamInviteTable.CREATED_AT + "," +
+                    TeamInviteTable.RESPONDED_AT + "," + TeamInviteTable.EXPIRES_AT + ") SELECT " +
+                    TeamInviteTable.INVITE_ID + "," + TeamInviteTable.WORKSPACE_ID + "," +
+                    TeamInviteTable.EMAIL + "," + TeamInviteTable.INVITED_USER_ID + "," +
+                    TeamInviteTable.INVITED_USER_CODE + "," +
+                    TeamInviteTable.INVITED_DISPLAY_NAME + "," + TeamInviteTable.WORKSPACE_NAME + "," +
+                    TeamInviteTable.ROLE + "," + TeamInviteTable.STATUS + "," +
+                    TeamInviteTable.INVITED_BY + "," + TeamInviteTable.CREATED_AT + "," +
+                    TeamInviteTable.RESPONDED_AT + "," + TeamInviteTable.EXPIRES_AT +
+                    " FROM team_invites_legacy");
+            database.execSQL("DROP TABLE team_invites_legacy");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.MANAGER_ID + " TEXT");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.START_DATE + " INTEGER");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.DUE_DATE + " INTEGER");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.COMPLETED_AT + " INTEGER");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.DELETED_AT + " INTEGER");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.VERSION + " INTEGER NOT NULL DEFAULT 1");
+            database.execSQL("ALTER TABLE " + ProjectTable.TABLE_NAME +
+                    " ADD COLUMN " + ProjectTable.SYNC_STATUS + " TEXT NOT NULL DEFAULT 'SYNCED'");
+            database.execSQL(CREATE_TASK_COMMENTS_TABLE);
+            database.execSQL(CREATE_TASK_ATTACHMENTS_TABLE);
+            database.execSQL(CREATE_TASK_DEPENDENCIES_TABLE);
+            database.execSQL(CREATE_PROJECT_MILESTONES_TABLE);
+            createIndexes(database);
+        }
+        if (oldVersion < 7) {
+            // Chức năng bấm giờ đã bị loại khỏi sản phẩm. Xóa bảng cũ để
+            // không tiếp tục giữ hoặc đồng bộ dữ liệu phiên làm việc.
+            database.execSQL("DROP TABLE IF EXISTS work_sessions");
+            database.execSQL("DROP INDEX IF EXISTS index_session_task");
+            database.execSQL("DROP INDEX IF EXISTS index_one_active_session_per_user");
         }
     }
 }

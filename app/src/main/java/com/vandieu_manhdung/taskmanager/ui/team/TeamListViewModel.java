@@ -10,8 +10,9 @@ import androidx.lifecycle.Observer;
 
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.sync.SyncBus;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.TeamRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.TeamRepository;
 import com.vandieu_manhdung.taskmanager.model.Workspace;
+import com.vandieu_manhdung.taskmanager.model.TeamInvite;
 
 import java.util.List;
 
@@ -23,6 +24,8 @@ public class TeamListViewModel extends AndroidViewModel {
     private final MutableLiveData<Boolean> loading = new MutableLiveData<>(false);
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<Workspace> createdTeam = new MutableLiveData<>();
+    private final MutableLiveData<List<TeamInvite>> invites = new MutableLiveData<>();
+    private final MutableLiveData<String> message = new MutableLiveData<>();
     private String userId;
 
     public TeamListViewModel(@NonNull Application application) {
@@ -53,6 +56,10 @@ public class TeamListViewModel extends AndroidViewModel {
                 loading.setValue(false);
                 error.setValue(exception.getMessage());
             }
+        });
+        repository.getPendingInvites(userId, new RepositoryCallback<List<TeamInvite>>() {
+            @Override public void onSuccess(List<TeamInvite> result) { invites.setValue(result); }
+            @Override public void onError(Exception exception) { error.setValue(exception.getMessage()); }
         });
     }
 
@@ -95,6 +102,25 @@ public class TeamListViewModel extends AndroidViewModel {
         return createdTeam;
     }
 
+    public LiveData<List<TeamInvite>> getInvites() { return invites; }
+    public LiveData<String> getMessage() { return message; }
+
+    public void respondToInvite(TeamInvite invite, boolean accept) {
+        loading.setValue(true);
+        repository.respondToInvite(invite.getInviteId(), userId, accept,
+                new RepositoryCallback<Boolean>() {
+                    @Override public void onSuccess(Boolean result) {
+                        loading.setValue(false);
+                        message.setValue(accept ? "Đã tham gia nhóm" : "Đã từ chối lời mời");
+                        loadTeams();
+                    }
+                    @Override public void onError(Exception exception) {
+                        loading.setValue(false);
+                        error.setValue(exception.getMessage());
+                    }
+                });
+    }
+
     public void clearError() {
         error.setValue(null);
     }
@@ -102,6 +128,7 @@ public class TeamListViewModel extends AndroidViewModel {
     public void clearCreatedTeam() {
         createdTeam.setValue(null);
     }
+    public void clearMessage() { message.setValue(null); }
 
     @Override
     protected void onCleared() {

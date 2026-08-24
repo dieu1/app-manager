@@ -48,8 +48,35 @@ service cloud.firestore {
     }
 
     function hasValidAssignee(workspaceId, data) {
-      return data.assigneeId == null
-        || isActiveUser(workspaceId, data.assigneeId);
+      return (!("assigneeId" in data)
+          || data.assigneeId == null
+          || isActiveUser(workspaceId, data.assigneeId))
+        && (!("assigneeIds" in data)
+          || (data.assigneeIds is list && data.assigneeIds.size() <= 50));
+    }
+
+    function currentUserIsAssignee(data) {
+      return (("assigneeId" in data) && data.assigneeId == request.auth.uid)
+        || (("assigneeIds" in data) && request.auth.uid in data.assigneeIds);
+    }
+
+    function taskExistsInWorkspace(taskId, workspaceId) {
+      return exists(/databases/$(database)/documents/tasks/$(taskId))
+        && get(/databases/$(database)/documents/tasks/$(taskId)).data.workspaceId
+          == workspaceId;
+    }
+
+    function tasksShareProject(taskId, dependsOnTaskId, workspaceId) {
+      return taskExistsInWorkspace(taskId, workspaceId)
+        && taskExistsInWorkspace(dependsOnTaskId, workspaceId)
+        && get(/databases/$(database)/documents/tasks/$(taskId)).data.projectId
+          == get(/databases/$(database)/documents/tasks/$(dependsOnTaskId)).data.projectId;
+    }
+
+    function canEditTaskData(workspaceId, data) {
+      return isManager(workspaceId)
+        || data.createdBy == request.auth.uid
+        || currentUserIsAssignee(data);
     }
 
     match /users/{userId} {
@@ -71,12 +98,22 @@ service cloud.firestore {
       allow list: if false;
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.userCode == userCode;
+        && request.resource.data.userCode == userCode
+        && request.resource.data.keys()
+          .hasOnly(["userCode", "userId", "displayName", "updatedAt"]);
       allow update: if signedIn()
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.userCode == resource.data.userCode;
+        && request.resource.data.userCode == resource.data.userCode
+        && request.resource.data.keys()
+          .hasOnly(["userCode", "userId", "displayName", "updatedAt"]);
       allow delete: if false;
+    }
+
+    match /user_devices/{deviceId} {
+      allow read, delete: if signedIn() && request.auth.uid == resource.data.userId;
+      allow create, update: if signedIn()
+        && request.auth.uid == request.resource.data.userId;
     }
 
     match /workspaces/{workspaceId} {
@@ -101,7 +138,18 @@ service cloud.firestore {
           || isWorkspaceOwnerByDocument(request.resource.data.workspaceId)
           || isWorkspaceOwnerAfterWrite(request.resource.data.workspaceId)
           || (isManager(request.resource.data.workspaceId)
-            && request.resource.data.role == "MEMBER"));
+            && request.resource.data.role == "MEMBER")
+          || (request.resource.data.userId == request.auth.uid
+            && request.resource.data.status == "ACTIVE"
+            && request.resource.data.inviteId is string
+            && getAfter(/databases/$(database)/documents/team_invites/$(request.resource.data.inviteId)).data.invitedUserId
+              == request.auth.uid
+            && getAfter(/databases/$(database)/documents/team_invites/$(request.resource.data.inviteId)).data.workspaceId
+              == request.resource.data.workspaceId
+            && getAfter(/databases/$(database)/documents/team_invites/$(request.resource.data.inviteId)).data.role
+              == request.resource.data.role
+            && getAfter(/databases/$(database)/documents/team_invites/$(request.resource.data.inviteId)).data.status
+              == "ACCEPTED"));
       allow update: if signedIn()
         && request.resource.data.workspaceId == resource.data.workspaceId
         && request.resource.data.userId == resource.data.userId
@@ -113,8 +161,43 @@ service cloud.firestore {
         && (isOwner(resource.data.workspaceId)
           || (isManager(resource.data.workspaceId)
             && resource.data.role == "MEMBER"
-            && request.resource.data.role == resource.data.role));
+            && request.resource.data.role == resource.data.role)
+          || (resource.data.userId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["displayName", "email", "updatedAt"]))
+          || (resource.data.userId == request.auth.uid
+            && resource.data.role == request.resource.data.role
+            && resource.data.status == "ACTIVE"
+            && request.resource.data.status == "REMOVED"
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["status", "updatedAt"])));
       allow delete: if isOwner(resource.data.workspaceId);
+    }
+
+    match /team_invites/{inviteId} {
+      allow read: if signedIn()
+        && (resource.data.invitedUserId == request.auth.uid
+          || isManager(resource.data.workspaceId));
+      allow create: if signedIn()
+        && request.resource.data.inviteId == inviteId
+        && isManager(request.resource.data.workspaceId)
+        && request.resource.data.invitedUserId != request.auth.uid
+        && request.resource.data.status == "PENDING"
+        && request.resource.data.expiresAt is int
+        && get(/databases/$(database)/documents/user_codes/$(request.resource.data.invitedUserCode)).data.userId
+          == request.resource.data.invitedUserId;
+      allow update: if signedIn()
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.invitedUserId == resource.data.invitedUserId
+        && request.resource.data.role == resource.data.role
+        && ((resource.data.invitedUserId == request.auth.uid
+          && resource.data.status == "PENDING"
+          && request.resource.data.status in ["ACCEPTED", "REJECTED"]
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["status", "respondedAt"]))
+          || (isManager(resource.data.workspaceId)
+            && request.resource.data.status == "CANCELLED"));
+      allow delete: if false;
     }
 
     match /projects/{projectId} {
@@ -127,6 +210,17 @@ service cloud.firestore {
       allow update: if isManager(resource.data.workspaceId)
         && request.resource.data.workspaceId == resource.data.workspaceId
         && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isManager(resource.data.workspaceId);
+    }
+
+    match /project_milestones/{milestoneId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isManager(request.resource.data.workspaceId)
+        && request.resource.data.milestoneId == milestoneId
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isManager(resource.data.workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.projectId == resource.data.projectId;
       allow delete: if isManager(resource.data.workspaceId);
     }
 
@@ -152,7 +246,7 @@ service cloud.firestore {
         )
         && (isManager(resource.data.workspaceId)
           || resource.data.createdBy == request.auth.uid
-          || resource.data.assigneeId == request.auth.uid);
+          || currentUserIsAssignee(resource.data));
       allow delete: if isManager(resource.data.workspaceId)
         || (isActiveMember(resource.data.workspaceId)
           && resource.data.createdBy == request.auth.uid);
@@ -162,32 +256,108 @@ service cloud.firestore {
       allow read: if isActiveMember(resource.data.workspaceId);
       allow create: if isActiveMember(request.resource.data.workspaceId)
         && request.resource.data.subtaskId == subtaskId
-        && request.resource.data.createdBy == request.auth.uid
         && exists(/databases/$(database)/documents/tasks/$(request.resource.data.taskId))
         && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.workspaceId
           == request.resource.data.workspaceId
-        && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.createdBy
-          == request.auth.uid;
+        && canEditTaskData(
+          request.resource.data.workspaceId,
+          get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data
+        );
       allow update: if isActiveMember(resource.data.workspaceId)
         && request.resource.data.workspaceId == resource.data.workspaceId
         && request.resource.data.taskId == resource.data.taskId
         && request.resource.data.createdBy == resource.data.createdBy
-        && resource.data.createdBy == request.auth.uid;
+        && canEditTaskData(
+          resource.data.workspaceId,
+          get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data
+        );
       allow delete: if isActiveMember(resource.data.workspaceId)
-        && resource.data.createdBy == request.auth.uid;
+        && canEditTaskData(
+          resource.data.workspaceId,
+          get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data
+        );
     }
 
-    match /work_sessions/{sessionId} {
-      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+    match /task_histories/{historyId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
       allow create: if signedIn()
+        && request.resource.data.historyId == historyId
         && request.resource.data.userId == request.auth.uid
-        && isActiveMember(request.resource.data.workspaceId);
-      allow update: if signedIn()
+        && isActiveMember(request.resource.data.workspaceId)
+        && exists(/databases/$(database)/documents/tasks/$(request.resource.data.taskId))
+        && get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.workspaceId
+          == request.resource.data.workspaceId;
+      allow update, delete: if false;
+    }
+
+    match /task_comments/{commentId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isActiveMember(request.resource.data.workspaceId)
+        && request.resource.data.commentId == commentId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000
+        && taskExistsInWorkspace(
+          request.resource.data.taskId,
+          request.resource.data.workspaceId
+        );
+      allow update: if isActiveMember(resource.data.workspaceId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.taskId == resource.data.taskId
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && taskExistsInWorkspace(resource.data.taskId, resource.data.workspaceId)
+        && ((resource.data.userId == request.auth.uid
+            && request.resource.data.message is string
+            && request.resource.data.message.size() > 0
+            && request.resource.data.message.size() <= 2000
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["message", "updatedAt", "deletedAt"]))
+          || (isManager(resource.data.workspaceId)
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["deletedAt", "updatedAt"])));
+      allow delete: if false;
+    }
+
+    match /task_attachments/{attachmentId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isActiveMember(request.resource.data.workspaceId)
+        && request.resource.data.attachmentId == attachmentId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.sizeBytes is int
+        && request.resource.data.sizeBytes >= 0
+        && request.resource.data.sizeBytes <= 20 * 1024 * 1024
+        && taskExistsInWorkspace(
+          request.resource.data.taskId,
+          request.resource.data.workspaceId
+        );
+      allow update: if isActiveMember(resource.data.workspaceId)
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.taskId == resource.data.taskId
-        && request.resource.data.workspaceId == resource.data.workspaceId;
-      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["displayName", "mimeType", "remoteUrl", "deletedAt"]);
+      allow delete: if false;
     }
+
+    match /task_dependencies/{dependencyId} {
+      allow read: if isActiveMember(resource.data.workspaceId);
+      allow create: if isActiveMember(request.resource.data.workspaceId)
+        && request.resource.data.createdBy == request.auth.uid
+        && dependencyId == request.resource.data.taskId + "_" +
+          request.resource.data.dependsOnTaskId
+        && request.resource.data.taskId != request.resource.data.dependsOnTaskId
+        && tasksShareProject(
+          request.resource.data.taskId,
+          request.resource.data.dependsOnTaskId,
+          request.resource.data.workspaceId
+        );
+      allow update: if false;
+      allow delete: if isActiveMember(resource.data.workspaceId)
+        && (resource.data.createdBy == request.auth.uid
+          || isManager(resource.data.workspaceId));
+    }
+
   }
 }

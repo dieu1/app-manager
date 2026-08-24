@@ -8,10 +8,12 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.TeamRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.TeamRepository;
 import com.vandieu_manhdung.taskmanager.model.Task;
 import com.vandieu_manhdung.taskmanager.model.TeamTaskItem;
 import com.vandieu_manhdung.taskmanager.model.TeamWorkspaceSnapshot;
+
+import java.util.List;
 
 public class TeamTaskFormViewModel extends AndroidViewModel {
 
@@ -78,10 +80,11 @@ public class TeamTaskFormViewModel extends AndroidViewModel {
             String status,
             String priority,
             int progress,
+            long startDate,
             long dueDate,
             int estimatedMinutes,
             String projectId,
-            String assigneeId
+            List<String> assigneeIds
     ) {
         Task task;
         TeamTaskItem existing = editingItem.getValue();
@@ -101,11 +104,12 @@ public class TeamTaskFormViewModel extends AndroidViewModel {
         task.setStatus(status);
         task.setPriority(priority);
         task.setProgress(progress);
+        task.setStartDate(startDate);
         task.setDueDate(dueDate);
         task.setEstimatedMinutes(estimatedMinutes);
 
         loading.setValue(true);
-        repository.saveTeamTask(task, assigneeId, userId, new RepositoryCallback<Task>() {
+        repository.saveTeamTask(task, assigneeIds, userId, new RepositoryCallback<Task>() {
             @Override
             public void onSuccess(Task result) {
                 loading.setValue(false);

@@ -15,6 +15,10 @@ public class Task {
     private long startDate;
     private long dueDate;
     private int estimatedMinutes;
+    private long completedAt;
+    private long deletedAt;
+    private int version;
+    private String syncStatus;
 
     private long createdAt;
     private long updatedAt;
@@ -117,6 +121,22 @@ public class Task {
     public void setEstimatedMinutes(int estimatedMinutes) {
         this.estimatedMinutes = estimatedMinutes;
     }
+
+    public long getCompletedAt() { return completedAt; }
+
+    public void setCompletedAt(long completedAt) { this.completedAt = completedAt; }
+
+    public long getDeletedAt() { return deletedAt; }
+
+    public void setDeletedAt(long deletedAt) { this.deletedAt = deletedAt; }
+
+    public int getVersion() { return version; }
+
+    public void setVersion(int version) { this.version = version; }
+
+    public String getSyncStatus() { return syncStatus; }
+
+    public void setSyncStatus(String syncStatus) { this.syncStatus = syncStatus; }
 
     public long getCreatedAt() {
         return createdAt;

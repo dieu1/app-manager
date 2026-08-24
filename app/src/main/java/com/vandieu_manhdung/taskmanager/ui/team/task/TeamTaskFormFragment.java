@@ -1,6 +1,7 @@
 package com.vandieu_manhdung.taskmanager.ui.team.task;
 
 import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,6 +29,7 @@ import com.vandieu_manhdung.taskmanager.model.Project;
 import com.vandieu_manhdung.taskmanager.model.TeamTaskItem;
 import com.vandieu_manhdung.taskmanager.model.TeamWorkspaceSnapshot;
 import com.vandieu_manhdung.taskmanager.model.WorkspaceMember;
+import com.vandieu_manhdung.taskmanager.ui.main.MainActivity;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -42,28 +44,35 @@ public class TeamTaskFormFragment extends Fragment {
     private static final String ARG_USER_ID = "user_id";
     private static final String ARG_TASK_ID = "task_id";
     private static final String STATE_DUE_DATE = "due_date";
+    private static final String STATE_START_DATE = "start_date";
+    private static final String STATE_ASSIGNEES = "assignee_ids";
 
     private String workspaceId;
     private String userId;
     private String taskId;
     private long dueDate;
+    private long startDate;
     private TeamTaskFormViewModel viewModel;
     private TeamWorkspaceSnapshot snapshot;
     private TeamTaskItem editingItem;
     private List<Project> projects = List.of();
     private List<WorkspaceMember> members = List.of();
+    private final java.util.LinkedHashSet<String> selectedAssigneeIds =
+            new java.util.LinkedHashSet<>();
+    private boolean assigneesRestored;
     private boolean populated;
 
     private EditText title;
     private EditText description;
     private EditText estimatedMinutes;
     private Spinner projectSpinner;
-    private Spinner assigneeSpinner;
+    private TextView assigneesText;
     private Spinner statusSpinner;
     private Spinner prioritySpinner;
     private SeekBar progressSeek;
     private TextView progressText;
     private TextView dueDateText;
+    private TextView startDateText;
     private View saveButton;
     private View deleteButton;
     private ProgressBar loadingView;
@@ -99,6 +108,14 @@ public class TeamTaskFormFragment extends Fragment {
         taskId = requireArguments().getString(ARG_TASK_ID);
         if (savedInstanceState != null) {
             dueDate = savedInstanceState.getLong(STATE_DUE_DATE);
+            startDate = savedInstanceState.getLong(STATE_START_DATE);
+            ArrayList<String> restored = savedInstanceState.getStringArrayList(STATE_ASSIGNEES);
+            if (restored != null) {
+                selectedAssigneeIds.addAll(restored);
+                assigneesRestored = true;
+            }
+        } else {
+            startDate = System.currentTimeMillis();
         }
         bind(view);
         setupStaticSpinners();
@@ -109,15 +126,21 @@ public class TeamTaskFormFragment extends Fragment {
         deleteButton.setVisibility(taskId == null ? View.GONE : View.VISIBLE);
         view.findViewById(R.id.buttonCancelTeamTask).setOnClickListener(
                 button -> getParentFragmentManager().popBackStack());
+        view.findViewById(R.id.buttonTaskFormNotifications).setOnClickListener(
+                button -> ((MainActivity) requireActivity()).openNotifications());
         view.findViewById(R.id.buttonTeamSelectDueDate).setOnClickListener(
-                button -> showDatePicker());
+                button -> showDateTimePicker(false));
+        view.findViewById(R.id.buttonTeamSelectStartDate).setOnClickListener(
+                button -> showDateTimePicker(true));
         view.findViewById(R.id.buttonTeamClearDueDate).setOnClickListener(button -> {
             dueDate = 0;
             displayDueDate();
         });
+        assigneesText.setOnClickListener(button -> showAssigneePicker());
         saveButton.setOnClickListener(button -> save());
         deleteButton.setOnClickListener(button -> confirmDelete());
         displayDueDate();
+        displayStartDate();
 
         viewModel = new ViewModelProvider(this).get(TeamTaskFormViewModel.class);
         observe();
@@ -129,12 +152,13 @@ public class TeamTaskFormFragment extends Fragment {
         description = view.findViewById(R.id.editTeamTaskDescription);
         estimatedMinutes = view.findViewById(R.id.editTeamEstimatedMinutes);
         projectSpinner = view.findViewById(R.id.spinnerTeamTaskProject);
-        assigneeSpinner = view.findViewById(R.id.spinnerTeamTaskAssignee);
+        assigneesText = view.findViewById(R.id.textTeamTaskAssignees);
         statusSpinner = view.findViewById(R.id.spinnerTeamTaskStatus);
         prioritySpinner = view.findViewById(R.id.spinnerTeamTaskPriority);
         progressSeek = view.findViewById(R.id.seekTeamTaskProgress);
         progressText = view.findViewById(R.id.textTeamTaskProgress);
         dueDateText = view.findViewById(R.id.textTeamSelectedDueDate);
+        startDateText = view.findViewById(R.id.textTeamSelectedStartDate);
         saveButton = view.findViewById(R.id.buttonSaveTeamTask);
         deleteButton = view.findViewById(R.id.buttonDeleteTeamTask);
         loadingView = view.findViewById(R.id.progressTeamTaskForm);
@@ -199,10 +223,8 @@ public class TeamTaskFormFragment extends Fragment {
             members = value.getMembers();
             List<String> projectNames = new ArrayList<>();
             for (Project project : projects) projectNames.add(project.getName());
-            List<String> memberNames = new ArrayList<>();
-            for (WorkspaceMember member : members) memberNames.add(member.getDisplayName());
             setSpinner(projectSpinner, projectNames);
-            setSpinner(assigneeSpinner, memberNames);
+            updateAssigneeSummary();
             tryPopulate();
         });
         viewModel.getEditingItem().observe(getViewLifecycleOwner(), item -> {
@@ -241,8 +263,10 @@ public class TeamTaskFormFragment extends Fragment {
             return;
         }
         if (taskId == null) {
-            int currentMember = memberPosition(userId);
-            if (currentMember >= 0) assigneeSpinner.setSelection(currentMember);
+            if (!assigneesRestored && memberPosition(userId) >= 0) {
+                selectedAssigneeIds.add(userId);
+            }
+            updateAssigneeSummary();
             populated = true;
             return;
         }
@@ -250,15 +274,22 @@ public class TeamTaskFormFragment extends Fragment {
         description.setText(editingItem.getTask().getDescription());
         estimatedMinutes.setText(String.valueOf(editingItem.getTask().getEstimatedMinutes()));
         projectSpinner.setSelection(projectPosition(editingItem.getTask().getProjectId()));
-        assigneeSpinner.setSelection(memberPosition(editingItem.getAssigneeId()));
+        if (!assigneesRestored) {
+            selectedAssigneeIds.clear();
+            selectedAssigneeIds.addAll(editingItem.getAssigneeIds());
+        }
+        updateAssigneeSummary();
         statusSpinner.setSelection(statusPosition(editingItem.getTask().getStatus()));
         prioritySpinner.setSelection(priorityPosition(editingItem.getTask().getPriority()));
         progressSeek.setProgress(editingItem.getTask().getProgress());
+        startDate = editingItem.getTask().getStartDate();
         dueDate = editingItem.getTask().getDueDate();
+        displayStartDate();
         displayDueDate();
 
         boolean canEdit = TeamRules.canEditTask(
-                snapshot.getCurrentRole(), userId, editingItem.getTask(), editingItem.getAssigneeId());
+                snapshot.getCurrentRole(), userId, editingItem.getTask(),
+                editingItem.getAssigneeIds());
         boolean canDelete = TeamRules.canDeleteTask(
                 snapshot.getCurrentRole(), userId, editingItem.getTask());
         saveButton.setVisibility(canEdit ? View.VISIBLE : View.GONE);
@@ -272,12 +303,13 @@ public class TeamTaskFormFragment extends Fragment {
         description.setEnabled(enabled);
         estimatedMinutes.setEnabled(enabled);
         projectSpinner.setEnabled(enabled);
-        assigneeSpinner.setEnabled(enabled);
+        assigneesText.setEnabled(enabled);
         statusSpinner.setEnabled(enabled);
         prioritySpinner.setEnabled(enabled);
         progressSeek.setEnabled(enabled && statusSpinner.getSelectedItemPosition() != 0 &&
                 statusSpinner.getSelectedItemPosition() != 2);
         requireView().findViewById(R.id.buttonTeamSelectDueDate).setEnabled(enabled);
+        requireView().findViewById(R.id.buttonTeamSelectStartDate).setEnabled(enabled);
         requireView().findViewById(R.id.buttonTeamClearDueDate).setEnabled(enabled);
     }
 
@@ -290,6 +322,10 @@ public class TeamTaskFormFragment extends Fragment {
         if (projects.isEmpty() || members.isEmpty()) {
             Toast.makeText(requireContext(), R.string.team_task_missing_context,
                     Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (selectedAssigneeIds.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.assignee_required, Toast.LENGTH_LONG).show();
             return;
         }
         int minutes = 0;
@@ -307,11 +343,57 @@ public class TeamTaskFormFragment extends Fragment {
                 description.getText().toString(),
                 statusValue(),
                 priorityValue(),
-                progressSeek.getProgress(),
+                statusSpinner.getSelectedItemPosition() == 2 ? 100 :
+                        (statusSpinner.getSelectedItemPosition() == 1 ?
+                                Math.max(1, progressSeek.getProgress()) : 0),
+                startDate,
                 dueDate,
                 minutes,
                 projects.get(projectSpinner.getSelectedItemPosition()).getProjectId(),
-                members.get(assigneeSpinner.getSelectedItemPosition()).getUserId());
+                new ArrayList<>(selectedAssigneeIds));
+    }
+
+    private void showAssigneePicker() {
+        if (members.isEmpty()) return;
+        String[] labels = new String[members.size()];
+        boolean[] checked = new boolean[members.size()];
+        for (int index = 0; index < members.size(); index++) {
+            WorkspaceMember member = members.get(index);
+            labels[index] = member.getDisplayName();
+            checked[index] = selectedAssigneeIds.contains(member.getUserId());
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.select_assignees_title)
+                .setMultiChoiceItems(labels, checked,
+                        (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.save, (dialog, which) -> {
+                    selectedAssigneeIds.clear();
+                    for (int index = 0; index < members.size(); index++) {
+                        if (checked[index]) {
+                            selectedAssigneeIds.add(members.get(index).getUserId());
+                        }
+                    }
+                    updateAssigneeSummary();
+                })
+                .show();
+    }
+
+    private void updateAssigneeSummary() {
+        if (selectedAssigneeIds.isEmpty()) {
+            assigneesText.setText(R.string.select_assignees);
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        for (WorkspaceMember member : members) {
+            if (selectedAssigneeIds.contains(member.getUserId())) {
+                names.add(member.getDisplayName());
+            }
+        }
+        assigneesText.setText(getString(
+                R.string.selected_assignees_count,
+                names.size(),
+                String.join(", ", names)));
     }
 
     private void confirmDelete() {
@@ -323,17 +405,25 @@ public class TeamTaskFormFragment extends Fragment {
                 .show();
     }
 
-    private void showDatePicker() {
+    private void showDateTimePicker(boolean selectingStart) {
         Calendar calendar = Calendar.getInstance();
-        if (dueDate > 0) calendar.setTimeInMillis(dueDate);
+        long current = selectingStart ? startDate : dueDate;
+        if (current > 0) calendar.setTimeInMillis(current);
         DatePickerDialog dialog = new DatePickerDialog(
                 requireContext(),
                 (picker, year, month, day) -> {
-                    Calendar selected = Calendar.getInstance();
-                    selected.set(year, month, day, 23, 59, 59);
-                    selected.set(Calendar.MILLISECOND, 999);
-                    dueDate = selected.getTimeInMillis();
-                    displayDueDate();
+                    new TimePickerDialog(requireContext(), (timePicker, hour, minute) -> {
+                        Calendar selected = Calendar.getInstance();
+                        selected.set(year, month, day, hour, minute, 0);
+                        selected.set(Calendar.MILLISECOND, 0);
+                        if (selectingStart) {
+                            startDate = selected.getTimeInMillis();
+                            displayStartDate();
+                        } else {
+                            dueDate = selected.getTimeInMillis();
+                            displayDueDate();
+                        }
+                    }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show();
                 },
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),
@@ -342,11 +432,19 @@ public class TeamTaskFormFragment extends Fragment {
         dialog.show();
     }
 
+    private void displayStartDate() {
+        startDateText.setText(startDate <= 0
+                ? getString(R.string.no_start_datetime_selected)
+                : getString(R.string.selected_start_datetime,
+                        new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                                .format(new Date(startDate))));
+    }
+
     private void displayDueDate() {
         dueDateText.setText(dueDate <= 0
                 ? getString(R.string.no_due_date_selected)
                 : getString(R.string.selected_due_date,
-                        new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                        new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
                                 .format(new Date(dueDate))));
     }
 
@@ -406,6 +504,9 @@ public class TeamTaskFormFragment extends Fragment {
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putLong(STATE_DUE_DATE, dueDate);
+        outState.putLong(STATE_START_DATE, startDate);
+        outState.putStringArrayList(STATE_ASSIGNEES,
+                new ArrayList<>(selectedAssigneeIds));
         super.onSaveInstanceState(outState);
     }
 }

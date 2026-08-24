@@ -6,9 +6,14 @@ public class TaskSubtask {
     private String taskId;
     private String workspaceId;
     private String createdBy;
+    private String assigneeId;
     private String title;
     private int estimatedMinutes;
     private boolean completed;
+    private long completedAt;
+    private long deletedAt;
+    private int version;
+    private String syncStatus;
     private int sortOrder;
     private long createdAt;
     private long updatedAt;
@@ -45,6 +50,9 @@ public class TaskSubtask {
         this.createdBy = createdBy;
     }
 
+    public String getAssigneeId() { return assigneeId; }
+    public void setAssigneeId(String assigneeId) { this.assigneeId = assigneeId; }
+
     public String getTitle() {
         return title;
     }
@@ -68,6 +76,22 @@ public class TaskSubtask {
     public void setCompleted(boolean completed) {
         this.completed = completed;
     }
+
+    public long getCompletedAt() { return completedAt; }
+
+    public void setCompletedAt(long completedAt) { this.completedAt = completedAt; }
+
+    public long getDeletedAt() { return deletedAt; }
+
+    public void setDeletedAt(long deletedAt) { this.deletedAt = deletedAt; }
+
+    public int getVersion() { return version; }
+
+    public void setVersion(int version) { this.version = version; }
+
+    public String getSyncStatus() { return syncStatus; }
+
+    public void setSyncStatus(String syncStatus) { this.syncStatus = syncStatus; }
 
     public int getSortOrder() {
         return sortOrder;

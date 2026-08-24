@@ -20,4 +20,27 @@
     <color name="status_blue_light">#EBF3FF</color>
     <color name="status_red">#E53935</color>
     <color name="status_red_light">#FEEBEE</color>
+
+    <!-- Team workspace visual system -->
+    <color name="team_primary">#5756D9</color>
+    <color name="team_primary_dark">#3735A8</color>
+    <color name="team_primary_soft">#EEEDFF</color>
+    <color name="team_secondary">#0FAF9B</color>
+    <color name="team_secondary_soft">#E5F8F4</color>
+    <color name="team_background">#F6F7FB</color>
+    <color name="team_surface">#FFFFFFFF</color>
+    <color name="team_surface_alt">#F0F2F8</color>
+    <color name="team_border">#E2E5EE</color>
+    <color name="team_text_primary">#17192D</color>
+    <color name="team_text_secondary">#6F7588</color>
+    <color name="team_success">#178A62</color>
+    <color name="team_success_soft">#E5F6EF</color>
+    <color name="team_warning">#C97812</color>
+    <color name="team_warning_soft">#FFF2DB</color>
+    <color name="team_danger">#CF3F4F</color>
+    <color name="team_danger_soft">#FDEBED</color>
+    <color name="team_info">#356FD4</color>
+    <color name="team_info_soft">#EAF1FF</color>
+    <color name="team_white_16">#29FFFFFF</color>
+    <color name="team_white_82">#D1FFFFFF</color>
 </resources>

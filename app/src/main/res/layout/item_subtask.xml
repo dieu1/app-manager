@@ -71,7 +71,8 @@
             android:layout_height="32dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:gravity="center"
-            android:text="×"
+            android:contentDescription="@string/delete_subtask"
+            android:text="@string/delete_symbol"
             android:textColor="#E53935"
             android:textSize="20sp"
             android:textStyle="bold" />

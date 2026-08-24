@@ -12,7 +12,7 @@ import com.vandieu_manhdung.taskmanager.core.callback.RepositoryCallback;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
 import com.vandieu_manhdung.taskmanager.core.sync.SyncBus;
 import com.vandieu_manhdung.taskmanager.core.util.TaskRules;
-import com.vandieu_manhdung.taskmanager.data.reponsitory.TeamRepository;
+import com.vandieu_manhdung.taskmanager.data.repository.TeamRepository;
 import com.vandieu_manhdung.taskmanager.model.Project;
 import com.vandieu_manhdung.taskmanager.model.ProjectProgress;
 import com.vandieu_manhdung.taskmanager.model.TeamDashboardData;

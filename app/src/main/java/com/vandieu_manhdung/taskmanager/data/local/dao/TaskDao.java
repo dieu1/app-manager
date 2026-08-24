@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase;
 
 import com.vandieu_manhdung.taskmanager.core.constant.TaskSortOption;
 import com.vandieu_manhdung.taskmanager.core.constant.TaskStatus;
+import com.vandieu_manhdung.taskmanager.core.constant.SyncStatus;
 import com.vandieu_manhdung.taskmanager.data.local.database.DatabaseContract.TaskTable;
 import com.vandieu_manhdung.taskmanager.data.local.database.TaskManagerDatabaseHelper;
 import com.vandieu_manhdung.taskmanager.model.Task;
@@ -68,6 +69,7 @@ public class TaskDao {
         SQLiteDatabase database =
                 databaseHelper.getWritableDatabase();
 
+        Task existing = findByIdIncludingDeleted(taskId);
         ContentValues values = new ContentValues();
 
         values.put(TaskTable.STATUS, status);
@@ -76,6 +78,8 @@ public class TaskDao {
                 TaskTable.UPDATED_AT,
                 System.currentTimeMillis()
         );
+        values.put(TaskTable.VERSION, existing == null ? 1 : existing.getVersion() + 1);
+        values.put(TaskTable.SYNC_STATUS, SyncStatus.PENDING);
 
         return database.update(
                 TaskTable.TABLE_NAME,
@@ -83,6 +87,46 @@ public class TaskDao {
                 TaskTable.TASK_ID + " = ?",
                 new String[]{taskId}
         );
+    }
+
+    public int updateStatusAndProgressFromRemote(String taskId, String status, int progress) {
+        ContentValues values = new ContentValues();
+        values.put(TaskTable.STATUS, status);
+        values.put(TaskTable.PROGRESS, progress);
+        return databaseHelper.getWritableDatabase().update(
+                TaskTable.TABLE_NAME, values, TaskTable.TASK_ID + " = ?",
+                new String[]{taskId});
+    }
+
+    public int softDelete(String taskId, long deletedAt, int version) {
+        ContentValues values = new ContentValues();
+        values.put(TaskTable.DELETED_AT, deletedAt);
+        values.put(TaskTable.UPDATED_AT, deletedAt);
+        values.put(TaskTable.VERSION, Math.max(1, version));
+        values.put(TaskTable.SYNC_STATUS, SyncStatus.PENDING);
+        return databaseHelper.getWritableDatabase().update(
+                TaskTable.TABLE_NAME, values, TaskTable.TASK_ID + " = ?",
+                new String[]{taskId});
+    }
+
+    public int restore(String taskId, long updatedAt, int version) {
+        ContentValues values = new ContentValues();
+        values.putNull(TaskTable.DELETED_AT);
+        values.put(TaskTable.UPDATED_AT, updatedAt);
+        values.put(TaskTable.VERSION, Math.max(1, version));
+        values.put(TaskTable.SYNC_STATUS, SyncStatus.PENDING);
+        return databaseHelper.getWritableDatabase().update(
+                TaskTable.TABLE_NAME, values, TaskTable.TASK_ID + " = ?",
+                new String[]{taskId});
+    }
+
+    public void markSyncStatus(String taskId, int version, String status) {
+        ContentValues values = new ContentValues();
+        values.put(TaskTable.SYNC_STATUS, status);
+        databaseHelper.getWritableDatabase().update(
+                TaskTable.TABLE_NAME, values,
+                TaskTable.TASK_ID + " = ? AND " + TaskTable.VERSION + " = ?",
+                new String[]{taskId, String.valueOf(version)});
     }
 
     public int delete(String taskId) {
@@ -103,6 +147,11 @@ public class TaskDao {
      */
 
     public Task findById(String taskId) {
+        Task task = findByIdIncludingDeleted(taskId);
+        return task != null && task.getDeletedAt() <= 0 ? task : null;
+    }
+
+    public Task findByIdIncludingDeleted(String taskId) {
         SQLiteDatabase database =
                 databaseHelper.getReadableDatabase();
 
@@ -221,6 +270,12 @@ public class TaskDao {
 
         arguments.add(workspaceId);
 
+        selection.append(" AND (")
+                .append(TaskTable.DELETED_AT)
+                .append(" IS NULL OR ")
+                .append(TaskTable.DELETED_AT)
+                .append(" = 0)");
+
         // Công việc cá nhân không thuộc dự án Team.
         selection.append(" AND ")
                 .append(TaskTable.PROJECT_ID)
@@ -297,6 +352,8 @@ public class TaskDao {
 
         String selection =
                 TaskTable.WORKSPACE_ID + " = ? AND " +
+                        "(" + TaskTable.DELETED_AT + " IS NULL OR " +
+                        TaskTable.DELETED_AT + " = 0) AND " +
                         TaskTable.PROJECT_ID + " IS NULL AND " +
                         TaskTable.DUE_DATE + " IS NOT NULL AND " +
                         TaskTable.DUE_DATE + " > 0 AND " +
@@ -342,7 +399,8 @@ public class TaskDao {
                 "SELECT COUNT(*) FROM " +
                         TaskTable.TABLE_NAME +
                         " WHERE " + TaskTable.WORKSPACE_ID +
-                        " = ? AND " + TaskTable.PROJECT_ID +
+                        " = ? AND (" + TaskTable.DELETED_AT + " IS NULL OR " +
+                        TaskTable.DELETED_AT + " = 0) AND " + TaskTable.PROJECT_ID +
                         " IS NULL";
 
         try (Cursor cursor = database.rawQuery(
@@ -369,6 +427,8 @@ public class TaskDao {
                         TaskTable.TABLE_NAME +
                         " WHERE " + TaskTable.WORKSPACE_ID +
                         " = ? AND " +
+                        "(" + TaskTable.DELETED_AT + " IS NULL OR " +
+                        TaskTable.DELETED_AT + " = 0) AND " +
                         TaskTable.PROJECT_ID +
                         " IS NULL AND " +
                         TaskTable.STATUS + " = ?";
@@ -397,6 +457,8 @@ public class TaskDao {
                         TaskTable.TABLE_NAME +
                         " WHERE " +
                         TaskTable.WORKSPACE_ID + " = ? AND " +
+                        "(" + TaskTable.DELETED_AT + " IS NULL OR " +
+                        TaskTable.DELETED_AT + " = 0) AND " +
                         TaskTable.PROJECT_ID + " IS NULL AND " +
                         TaskTable.DUE_DATE + " IS NOT NULL AND " +
                         TaskTable.DUE_DATE + " > 0 AND " +
@@ -430,6 +492,8 @@ public class TaskDao {
                 TaskTable.PROJECT_ID + " = '') AND (" +
                 TaskTable.START_DATE + " > ? OR " +
                 TaskTable.DUE_DATE + " > ?) AND " +
+                "(" + TaskTable.DELETED_AT + " IS NULL OR " +
+                TaskTable.DELETED_AT + " = 0) AND " +
                 TaskTable.STATUS + " NOT IN (?, ?)";
         try (Cursor cursor = database.query(
                 TaskTable.TABLE_NAME,
@@ -452,10 +516,26 @@ public class TaskDao {
         return result;
     }
 
+    public List<Task> findAllReminderTasks() {
+        List<Task> result = new ArrayList<>();
+        String selection = "(" + TaskTable.START_DATE + " > 0 OR " +
+                TaskTable.DUE_DATE + " > 0) AND (" + TaskTable.DELETED_AT + " IS NULL OR " +
+                TaskTable.DELETED_AT + " = 0) AND " + TaskTable.STATUS + " NOT IN (?, ?)";
+        try (Cursor cursor = databaseHelper.getReadableDatabase().query(
+                TaskTable.TABLE_NAME, null, selection,
+                new String[]{TaskStatus.COMPLETED, TaskStatus.CANCELLED},
+                null, null, TaskTable.DUE_DATE + " ASC")) {
+            while (cursor.moveToNext()) result.add(mapCursorToTask(cursor));
+        }
+        return result;
+    }
+
     public int averagePersonalProgress(String workspaceId) {
         String sql = "SELECT COALESCE(ROUND(AVG(" + TaskTable.PROGRESS + ")), 0) " +
                 "FROM " + TaskTable.TABLE_NAME +
                 " WHERE " + TaskTable.WORKSPACE_ID + " = ? AND " +
+                "(" + TaskTable.DELETED_AT + " IS NULL OR " +
+                TaskTable.DELETED_AT + " = 0) AND " +
                 TaskTable.PROJECT_ID + " IS NULL AND " +
                 TaskTable.STATUS + " != ?";
         try (Cursor cursor = databaseHelper.getReadableDatabase().rawQuery(
@@ -464,6 +544,18 @@ public class TaskDao {
         )) {
             return cursor.moveToFirst() ? cursor.getInt(0) : 0;
         }
+    }
+
+    public List<Task> findDeletedPersonalTasks(String workspaceId) {
+        List<Task> result = new ArrayList<>();
+        String selection = TaskTable.WORKSPACE_ID + " = ? AND " +
+                TaskTable.PROJECT_ID + " IS NULL AND " + TaskTable.DELETED_AT + " > 0";
+        try (Cursor cursor = databaseHelper.getReadableDatabase().query(
+                TaskTable.TABLE_NAME, null, selection, new String[]{workspaceId},
+                null, null, TaskTable.DELETED_AT + " DESC")) {
+            while (cursor.moveToNext()) result.add(mapCursorToTask(cursor));
+        }
+        return result;
     }
 
     /*
@@ -528,6 +620,20 @@ public class TaskDao {
                 TaskTable.ESTIMATED_MINUTES,
                 task.getEstimatedMinutes()
         );
+
+        if (task.getCompletedAt() > 0) {
+            values.put(TaskTable.COMPLETED_AT, task.getCompletedAt());
+        } else {
+            values.putNull(TaskTable.COMPLETED_AT);
+        }
+        if (task.getDeletedAt() > 0) {
+            values.put(TaskTable.DELETED_AT, task.getDeletedAt());
+        } else {
+            values.putNull(TaskTable.DELETED_AT);
+        }
+        values.put(TaskTable.VERSION, Math.max(1, task.getVersion()));
+        values.put(TaskTable.SYNC_STATUS,
+                task.getSyncStatus() == null ? SyncStatus.SYNCED : task.getSyncStatus());
 
         values.put(
                 TaskTable.CREATED_AT,
@@ -636,6 +742,13 @@ public class TaskDao {
                         TaskTable.ESTIMATED_MINUTES
                 )
         ));
+
+        int completedAtColumn = cursor.getColumnIndexOrThrow(TaskTable.COMPLETED_AT);
+        task.setCompletedAt(cursor.isNull(completedAtColumn) ? 0 : cursor.getLong(completedAtColumn));
+        int deletedAtColumn = cursor.getColumnIndexOrThrow(TaskTable.DELETED_AT);
+        task.setDeletedAt(cursor.isNull(deletedAtColumn) ? 0 : cursor.getLong(deletedAtColumn));
+        task.setVersion(cursor.getInt(cursor.getColumnIndexOrThrow(TaskTable.VERSION)));
+        task.setSyncStatus(cursor.getString(cursor.getColumnIndexOrThrow(TaskTable.SYNC_STATUS)));
 
         task.setCreatedAt(cursor.getLong(
                 cursor.getColumnIndexOrThrow(
